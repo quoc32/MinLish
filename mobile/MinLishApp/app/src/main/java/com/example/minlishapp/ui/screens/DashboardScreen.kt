@@ -1,0 +1,392 @@
+package com.example.minlishapp.ui.screens
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.minlishapp.data.Deck
+import com.example.minlishapp.data.UserProgress
+import com.example.minlishapp.ui.theme.ColorStreakFlame
+
+@Composable
+fun DashboardScreen(
+    userProgress: UserProgress,
+    isDarkTheme: Boolean,
+    onThemeToggle: () -> Unit,
+    onNavigate: (Screen) -> Unit,
+    activeDeck: Deck?,
+    onActiveDeckSelect: (Deck) -> Unit,
+    decks: List<Deck>
+) {
+    var selectedDeck by remember { mutableStateOf<Deck?>(activeDeck ?: decks.firstOrNull()) }
+
+    Scaffold(
+        bottomBar = { AppBottomBar(currentScreen = Screen.Dashboard, onNavigate = onNavigate) }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(innerPadding)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Top Header: Chỉ số tổng quan & Theme Switcher
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                            .statusBarsPadding(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Level Badge
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${userProgress.level}",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = userProgress.name,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                                Text(
+                                    text = "${userProgress.xp} XP",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Streak & Theme
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(ColorStreakFlame.copy(alpha = 0.1f))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(text = "🔥", fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "${userProgress.streak} ngày",
+                                    color = ColorStreakFlame,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            IconButton(onClick = onThemeToggle) {
+                                Icon(
+                                    imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                    contentDescription = "Toggle Theme"
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Central content: Lộ trình dạng Duolingo theo chủ đề
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    contentPadding = PaddingValues(top = 24.dp, bottom = 140.dp) // Chừa chỗ cho card nổi
+                ) {
+                    item {
+                        Text(
+                            text = "Lộ trình học ${userProgress.targetGoal}",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 24.dp)
+                        )
+                    }
+
+                    // Render các chủ đề từ vựng động từ list decks
+                    decks.forEachIndexed { index, deck ->
+                        item {
+                            // Mở khóa nếu là chủ đề đầu tiên hoặc chủ đề trước đạt tiến độ tốt
+                            val isLocked = index > 0 && decks[index - 1].progress < 0.5f
+                            val progress = deck.progress
+                            val offsetPercent = when (index % 3) {
+                                0 -> -0.2f
+                                1 -> 0.2f
+                                else -> 0.0f
+                            }
+                            
+                            val isSelected = selectedDeck?.id == deck.id
+
+                            DuolingoNode(
+                                title = deck.name,
+                                icon = when (deck.name.lowercase()) {
+                                    "conferences" -> "💼"
+                                    "marketing" -> "📈"
+                                    "contracts" -> "📜"
+                                    "academic core" -> "🎓"
+                                    "science & tech" -> "🔬"
+                                    "hotels & stays" -> "🏨"
+                                    else -> "📚"
+                                },
+                                progress = progress,
+                                isLocked = isLocked,
+                                offsetPercent = offsetPercent,
+                                onClick = {
+                                    selectedDeck = deck
+                                    onActiveDeckSelect(deck)
+                                }
+                            )
+                        }
+
+                        if (index < decks.size - 1) {
+                            item {
+                                val nextOffsetPercent = when ((index + 1) % 3) {
+                                    0 -> -0.2f
+                                    1 -> 0.2f
+                                    else -> 0.0f
+                                }
+                                val currentOffsetPercent = when (index % 3) {
+                                    0 -> -0.2f
+                                    1 -> 0.2f
+                                    else -> 0.0f
+                                }
+                                NodeConnector(
+                                    height = 40.dp, 
+                                    offsetPercent = (currentOffsetPercent + nextOffsetPercent) / 2
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Card "Vào học" hiển thị thông tin chủ đề được chọn (nổi ở dưới màn hình)
+            selectedDeck?.let { deck ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Tag
+                            val tagText = deck.tags.firstOrNull() ?: "CHỦ ĐỀ"
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(100.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = tagText,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            // Title
+                            Text(
+                                text = deck.name,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            // Subtitle
+                            Text(
+                                text = "${deck.words.size} từ vựng",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            // Nút Vào học bo viền xanh lá chuẩn thiết kế
+                            val buttonColor = Color(0xFF10B981)
+                            OutlinedButton(
+                                onClick = {
+                                    onActiveDeckSelect(deck)
+                                    onNavigate(Screen.Flashcards)
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, buttonColor),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = buttonColor
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(46.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Vào học",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DuolingoNode(
+    title: String,
+    icon: String,
+    progress: Float,
+    isLocked: Boolean,
+    offsetPercent: Float, // -1f (bên trái cực bộ) -> 1f (bên phải cực bộ)
+    onClick: () -> Unit
+) {
+    val alignmentBias = offsetPercent * 100
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .offset(x = alignmentBias.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(80.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Draw progress circle ring or dashed ring
+            if (!isLocked) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxSize(),
+                    color = if (progress >= 1f) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                    strokeWidth = 6.dp,
+                    trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                    strokeCap = StrokeCap.Round
+                )
+            }
+
+            // Central button
+            IconButton(
+                onClick = onClick,
+                enabled = !isLocked,
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(
+                        when {
+                            isLocked -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                            progress >= 1f -> MaterialTheme.colorScheme.secondary
+                            else -> MaterialTheme.colorScheme.primary
+                        }
+                    )
+            ) {
+                if (isLocked) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Locked",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                } else {
+                    Text(
+                        text = icon,
+                        fontSize = 28.sp
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = title,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (isLocked) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+fun NodeConnector(height: androidx.compose.ui.unit.Dp, offsetPercent: Float) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height)
+    ) {
+        val startX = size.width / 2 + (offsetPercent * 100.dp.toPx())
+        // Vẽ đường nối nét đứt dọc nhẹ nghệ thuật
+        drawLine(
+            color = Color.LightGray.copy(alpha = 0.6f),
+            start = Offset(startX, 0f),
+            end = Offset(startX, size.height),
+            strokeWidth = 2.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+        )
+    }
+}
