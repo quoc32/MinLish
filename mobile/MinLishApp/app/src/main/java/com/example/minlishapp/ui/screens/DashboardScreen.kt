@@ -42,12 +42,15 @@ fun DashboardScreen(
     Scaffold(
         bottomBar = { AppBottomBar(currentScreen = Screen.Dashboard, onNavigate = onNavigate) }
     ) { innerPadding ->
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
         ) {
+            val isSmallScreen = maxHeight < 640.dp
+            val listBottomPadding = if (isSmallScreen) 110.dp else 140.dp
+
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -136,7 +139,7 @@ fun DashboardScreen(
                         .weight(1f)
                         .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    contentPadding = PaddingValues(top = 24.dp, bottom = 140.dp) // Chừa chỗ cho card nổi
+                    contentPadding = PaddingValues(top = 24.dp, bottom = listBottomPadding) // Chừa chỗ cho card nổi
                 ) {
                     item {
                         Text(
@@ -206,11 +209,16 @@ fun DashboardScreen(
 
             // Card "Vào học" hiển thị thông tin chủ đề được chọn (nổi ở dưới màn hình)
             selectedDeck?.let { deck ->
+                val cardPaddingHorizontal = if (isSmallScreen) 12.dp else 20.dp
+                val cardPaddingVertical = if (isSmallScreen) 8.dp else 16.dp
+                val contentPadding = if (isSmallScreen) 12.dp else 16.dp
+                val buttonHeight = if (isSmallScreen) 38.dp else 46.dp
+
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .padding(horizontal = cardPaddingHorizontal, vertical = cardPaddingVertical)
                 ) {
                     Card(
                         colors = CardDefaults.cardColors(
@@ -222,8 +230,8 @@ fun DashboardScreen(
                         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier.padding(contentPadding),
+                            verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 4.dp else 8.dp)
                         ) {
                             // Tag
                             val tagText = deck.tags.firstOrNull() ?: "CHỦ ĐỀ"
@@ -244,7 +252,7 @@ fun DashboardScreen(
                             // Title
                             Text(
                                 text = deck.name,
-                                fontSize = 18.sp,
+                                fontSize = if (isSmallScreen) 16.sp else 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -252,11 +260,11 @@ fun DashboardScreen(
                             // Subtitle
                             Text(
                                 text = "${deck.words.size} từ vựng",
-                                fontSize = 13.sp,
+                                fontSize = if (isSmallScreen) 12.sp else 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(if (isSmallScreen) 2.dp else 4.dp))
 
                             // Nút Vào học bo viền xanh lá chuẩn thiết kế
                             val buttonColor = Color(0xFF10B981)
@@ -272,7 +280,7 @@ fun DashboardScreen(
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(46.dp)
+                                    .height(buttonHeight)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,

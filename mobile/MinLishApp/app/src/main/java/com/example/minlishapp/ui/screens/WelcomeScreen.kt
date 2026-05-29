@@ -13,6 +13,8 @@ import androidx.compose.material3.*
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.*
@@ -131,27 +133,39 @@ fun WelcomeScreen(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        val screenHeight = maxHeight
+        val isSmallScreen = screenHeight < 680.dp
+
+        // Dynamic sizes
+        val illustrationSize = if (isSmallScreen) minOf(240.dp, screenHeight * 0.3f) else 300.dp
+        val topPadding = if (isSmallScreen) 16.dp else 40.dp
+        val bottomPadding = if (isSmallScreen) 10.dp else 20.dp
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
-                .systemBarsPadding(),
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .systemBarsPadding()
+                .then(
+                    if (isSmallScreen) Modifier.verticalScroll(rememberScrollState())
+                    else Modifier
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = if (isSmallScreen) Arrangement.spacedBy(16.dp) else Arrangement.SpaceBetween
         ) {
             // Phần trên: Tiêu đề & Giới thiệu
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 40.dp)
+                modifier = Modifier.padding(top = topPadding)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(if (isSmallScreen) 56.dp else 72.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
@@ -160,20 +174,20 @@ fun WelcomeScreen(
                         imageVector = Icons.Default.Translate,
                         contentDescription = "Welcome Icon",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(if (isSmallScreen) 28.dp else 36.dp)
                     )
                 }
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 12.dp else 20.dp))
                 Text(
                     text = "Chào mừng tới MinLish",
-                    fontSize = 28.sp,
+                    fontSize = if (isSmallScreen) 22.sp else 28.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 8.dp else 12.dp))
                 Text(
                     text = "Phương pháp Spaced Repetition (SM-2) kết hợp trò chơi hóa giúp bạn học từ vựng tiếng Anh không bao giờ quên.",
-                    fontSize = 14.sp,
+                    fontSize = if (isSmallScreen) 13.sp else 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 8.dp)
@@ -184,14 +198,14 @@ fun WelcomeScreen(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(320.dp)
+                    .size(illustrationSize + 20.dp)
                     .padding(8.dp)
                     .clip(RoundedCornerShape(24.dp))
             ) {
                 // Hào quang tỏa sáng phía sau chú trâu vàng
                 Box(
                     modifier = Modifier
-                        .size(280.dp)
+                        .size(illustrationSize - 20.dp)
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
@@ -207,7 +221,7 @@ fun WelcomeScreen(
                     painter = painterResource(id = R.drawable.buffalo_hello),
                     contentDescription = "Vietnamese Golden Buffalo Waving Hello",
                     modifier = Modifier
-                        .size(300.dp)
+                        .size(illustrationSize)
                         .clip(RoundedCornerShape(24.dp))
                 )
             }
@@ -216,7 +230,7 @@ fun WelcomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 20.dp),
+                    .padding(bottom = bottomPadding),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -224,7 +238,7 @@ fun WelcomeScreen(
                     onClick = { onNavigate(Screen.Login) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
+                        .height(50.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF2563EB),
@@ -234,48 +248,8 @@ fun WelcomeScreen(
                     RedWhiteEmailIcon()
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Đăng nhập bằng Email",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-
-                Button(
-                    onClick = {
-                        isLoading = true
-                        googleSignInClient.signOut().addOnCompleteListener {
-                            googleAuthLauncher.launch(googleSignInClient.signInIntent)
-                        }
-                    },
-                    enabled = !isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFEA4335),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape)
-                            .background(Color.White),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "G",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFFEA4335)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Đăng nhập với Google",
-                        fontSize = 15.sp,
+                        text = "Đăng nhập",
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -283,11 +257,9 @@ fun WelcomeScreen(
             }
         }
 
-            // Xóa mock dialog Google Account Picker vì đã dùng thực tế
-
-            if (errorMessage.isNotEmpty()) {
-                Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
-                errorMessage = ""
-            }
+        if (errorMessage.isNotEmpty()) {
+            Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+            errorMessage = ""
+        }
     }
 }

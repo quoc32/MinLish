@@ -38,15 +38,18 @@ fun OnboardingGoalsScreen(
         Triple("General", "🌍", "Communication & Basic")
     )
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        val isSmallScreen = maxHeight < 640.dp
+        val gridHeight = if (isSmallScreen) 210.dp else 280.dp
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(if (isSmallScreen) 16.dp else 24.dp)
                 .systemBarsPadding(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -87,11 +90,11 @@ fun OnboardingGoalsScreen(
 
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 12.dp else 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 12.dp else 16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(280.dp)
+                        .height(gridHeight)
                 ) {
                     items(goals) { (goalName, icon, desc) ->
                         val isSel = selectedGoal == goalName
@@ -109,33 +112,33 @@ fun OnboardingGoalsScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(
-                                modifier = Modifier.padding(20.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                modifier = Modifier.padding(if (isSmallScreen) 12.dp else 20.dp),
+                                verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 4.dp else 8.dp)
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = icon, fontSize = 32.sp)
+                                    Text(text = icon, fontSize = if (isSmallScreen) 24.sp else 32.sp)
                                     if (isSel) {
                                         Icon(
                                             imageVector = Icons.Default.CheckCircle,
                                             contentDescription = "Selected",
                                             tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(24.dp)
+                                            modifier = Modifier.size(if (isSmallScreen) 18.dp else 24.dp)
                                         )
                                     }
                                 }
                                 Text(
                                     text = goalName,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
+                                    fontSize = if (isSmallScreen) 14.sp else 18.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = desc,
-                                    fontSize = 12.sp,
+                                    fontSize = if (isSmallScreen) 10.sp else 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
@@ -153,7 +156,7 @@ fun OnboardingGoalsScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(if (isSmallScreen) 46.dp else 52.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Text(

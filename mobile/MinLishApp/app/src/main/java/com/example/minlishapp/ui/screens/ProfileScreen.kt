@@ -77,14 +77,18 @@ fun ProfileScreen(
     Scaffold(
         bottomBar = { AppBottomBar(currentScreen = Screen.Profile, onNavigate = onNavigate) }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
             Text(
                 text = "Hồ Sơ",
                 fontSize = 24.sp,
@@ -470,8 +474,9 @@ fun ProfileScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
         }
+    }
 
         // Time Picker Dialog Mock
         if (showTimePickerDialog) {

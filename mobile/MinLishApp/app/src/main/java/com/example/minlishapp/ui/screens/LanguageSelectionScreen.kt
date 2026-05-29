@@ -2,6 +2,8 @@ package com.example.minlishapp.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,17 +23,23 @@ import androidx.compose.ui.unit.sp
 fun LanguageSelectionScreen(onNavigate: (Screen) -> Unit) {
     var selectedLang by remember { mutableStateOf("vi") }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        val isSmallScreen = maxHeight < 640.dp
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(24.dp)
-                .systemBarsPadding(),
-            verticalArrangement = Arrangement.SpaceBetween
+                .systemBarsPadding()
+                .then(
+                    if (isSmallScreen) Modifier.verticalScroll(rememberScrollState())
+                    else Modifier
+                ),
+            verticalArrangement = if (isSmallScreen) Arrangement.spacedBy(16.dp) else Arrangement.SpaceBetween
         ) {
             Column {
                 Row(
@@ -57,7 +65,7 @@ fun LanguageSelectionScreen(onNavigate: (Screen) -> Unit) {
                     )
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 16.dp else 32.dp))
 
                 Text(
                     text = "Vui lòng chọn ngôn ngữ để hiển thị hướng dẫn và giải nghĩa từ vựng trong ứng dụng:",
@@ -65,7 +73,7 @@ fun LanguageSelectionScreen(onNavigate: (Screen) -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 16.dp else 24.dp))
 
                 // Thẻ chọn ngôn ngữ: Tiếng Việt
                 Card(
@@ -81,27 +89,27 @@ fun LanguageSelectionScreen(onNavigate: (Screen) -> Unit) {
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp)
+                        .padding(vertical = 4.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(if (isSmallScreen) 14.dp else 20.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "🇻🇳", fontSize = 32.sp)
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(text = "🇻🇳", fontSize = if (isSmallScreen) 24.sp else 32.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
                                     text = "Tiếng Việt",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
+                                    fontSize = 15.sp
                                 )
                                 Text(
                                     text = "Giao diện và giải nghĩa tiếng Việt",
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -127,27 +135,27 @@ fun LanguageSelectionScreen(onNavigate: (Screen) -> Unit) {
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp)
+                        .padding(vertical = 4.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(if (isSmallScreen) 14.dp else 20.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "🇬🇧", fontSize = 32.sp)
-                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(text = "🇬🇧", fontSize = if (isSmallScreen) 24.sp else 32.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
                                     text = "English",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
+                                    fontSize = 15.sp
                                 )
                                 Text(
                                     text = "Interface and definition in English",
-                                    fontSize = 12.sp,
+                                    fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -164,7 +172,7 @@ fun LanguageSelectionScreen(onNavigate: (Screen) -> Unit) {
                 onClick = { onNavigate(Screen.OnboardingGoals) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(if (isSmallScreen) 46.dp else 52.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
@@ -172,7 +180,7 @@ fun LanguageSelectionScreen(onNavigate: (Screen) -> Unit) {
             ) {
                 Text(
                     text = "Tiếp tục",
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.width(8.dp))

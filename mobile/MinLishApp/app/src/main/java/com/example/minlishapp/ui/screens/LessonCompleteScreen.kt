@@ -23,15 +23,17 @@ import kotlin.math.sin
 
 @Composable
 fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        val isSmallScreen = maxHeight < 640.dp
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(if (isSmallScreen) 16.dp else 24.dp)
                 .systemBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
@@ -45,7 +47,7 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                 verticalArrangement = Arrangement.Center
             ) {
                 Box(
-                    modifier = Modifier.size(160.dp),
+                    modifier = Modifier.size(if (isSmallScreen) 110.dp else 160.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     // Hiệu ứng pháo hoa xoay tròn nhẹ
@@ -61,42 +63,43 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                         // Bông pháo hoa tròn
                         for (i in 0 until 8) {
                             val angle = (i * 45) * (Math.PI / 180)
-                            val x = (size.width / 2 + 65.dp.toPx() * cos(angle)).toFloat()
-                            val y = (size.height / 2 + 65.dp.toPx() * sin(angle)).toFloat()
+                            val radiusPx = if (isSmallScreen) 42.dp.toPx() else 65.dp.toPx()
+                            val x = (size.width / 2 + radiusPx * cos(angle)).toFloat()
+                            val y = (size.height / 2 + radiusPx * sin(angle)).toFloat()
                             drawCircle(
                                 color = ColorStreakFlame,
-                                radius = 4.dp.toPx(),
+                                radius = 3.dp.toPx(),
                                 center = Offset(x, y)
                             )
                         }
                     }
 
                     // Cúp vàng chiến thắng ở giữa
-                    Text(text = "🏆", fontSize = 72.sp)
+                    Text(text = "🏆", fontSize = if (isSmallScreen) 48.sp else 72.sp)
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 12.dp else 24.dp))
 
                 Text(
                     text = "Hoàn Thành Bài Học!",
-                    fontSize = 26.sp,
+                    fontSize = if (isSmallScreen) 20.sp else 26.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
                 Text(
                     text = "Bạn đã hoàn thành xuất sắc mục tiêu ngày hôm nay. Hãy duy trì phong độ nhé!",
-                    fontSize = 14.sp,
+                    fontSize = if (isSmallScreen) 12.sp else 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp)
                 )
             }
 
             // Phần thống kê phần thưởng
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(if (isSmallScreen) 8.dp else 12.dp)
             ) {
                 // Thẻ XP
                 RewardCard(
@@ -104,7 +107,8 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                     icon = "⚡",
                     value = "+50 XP",
                     label = "Kinh nghiệm",
-                    color = ColorGood
+                    color = ColorGood,
+                    isSmallScreen = isSmallScreen
                 )
 
                 // Thẻ Streak
@@ -113,7 +117,8 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                     icon = "🔥",
                     value = "16 ngày",
                     label = "Chuỗi ngày",
-                    color = ColorStreakFlame
+                    color = ColorStreakFlame,
+                    isSmallScreen = isSmallScreen
                 )
 
                 // Thẻ Accuracy
@@ -122,7 +127,8 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                     icon = "🎯",
                     value = "100%",
                     label = "Chính xác",
-                    color = ColorEasy
+                    color = ColorEasy,
+                    isSmallScreen = isSmallScreen
                 )
             }
 
@@ -131,7 +137,7 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                 onClick = { onNavigate(Screen.Dashboard) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(if (isSmallScreen) 46.dp else 52.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Text(
@@ -150,7 +156,8 @@ fun RowScope.RewardCard(
     icon: String,
     value: String,
     label: String,
-    color: Color
+    color: Color,
+    isSmallScreen: Boolean
 ) {
     Card(
         colors = CardDefaults.cardColors(
@@ -160,24 +167,24 @@ fun RowScope.RewardCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier
             .weight(weight)
-            .height(100.dp)
+            .height(if (isSmallScreen) 76.dp else 100.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(8.dp),
+            modifier = Modifier.fillMaxSize().padding(if (isSmallScreen) 4.dp else 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(text = icon, fontSize = 24.sp)
-            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = icon, fontSize = if (isSmallScreen) 18.sp else 24.sp)
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = value,
                 fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
+                fontSize = if (isSmallScreen) 11.sp else 14.sp,
                 color = color
             )
             Text(
                 text = label,
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

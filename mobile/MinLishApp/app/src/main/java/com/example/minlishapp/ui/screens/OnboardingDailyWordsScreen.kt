@@ -25,15 +25,17 @@ fun OnboardingDailyWordsScreen(
 ) {
     var wordsPerDay by remember { mutableFloatStateOf(userProgress.wordsPerDay.toFloat()) }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        val isSmallScreen = maxHeight < 640.dp
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
+                .padding(if (isSmallScreen) 16.dp else 24.dp)
                 .systemBarsPadding(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -61,7 +63,7 @@ fun OnboardingDailyWordsScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 16.dp else 40.dp))
 
                 Text(
                     text = "Số từ học mỗi ngày:",
@@ -70,7 +72,7 @@ fun OnboardingDailyWordsScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 12.dp else 24.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -110,7 +112,7 @@ fun OnboardingDailyWordsScreen(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(if (isSmallScreen) 16.dp else 32.dp))
 
                 // Hộp phân tích thông minh
                 Card(
@@ -123,16 +125,16 @@ fun OnboardingDailyWordsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(if (isSmallScreen) 12.dp else 20.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "📊", fontSize = 32.sp)
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(text = "📊", fontSize = if (isSmallScreen) 24.sp else 32.sp)
+                        Spacer(modifier = Modifier.width(if (isSmallScreen) 10.dp else 16.dp))
                         Text(
                             text = "Ước tính: Học khoảng ${wordsPerDay.toInt() * 30} từ mới sau 1 tháng. Bạn sẽ nhanh chóng thành thạo bộ từ mục tiêu ${userProgress.targetGoal}!",
-                            fontSize = 14.sp,
+                            fontSize = if (isSmallScreen) 12.sp else 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 20.sp
+                            lineHeight = if (isSmallScreen) 16.sp else 20.sp
                         )
                     }
                 }
@@ -149,7 +151,7 @@ fun OnboardingDailyWordsScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(if (isSmallScreen) 46.dp else 52.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Text(
