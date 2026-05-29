@@ -1,0 +1,48 @@
+@baseUrl = http://localhost:3000
+
+### 1. Đăng ký tài khoản (Register)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "testuser@gmail.com",
+  "password": "password123",
+  "displayName": "Test User",
+  "targetGoal": "IELTS"
+}
+
+### 2. Đăng nhập (Login)
+# @name loginRequest
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "testuser@gmail.com",
+  "password": "password123"
+}
+
+### Lấy token từ kết quả đăng nhập (cần extension REST Client xử lý)
+@token = {{loginRequest.response.body.data.session.access_token}}
+
+### 3. Đăng nhập với Google ID Token (Yêu cầu ID Token thật từ client)
+POST {{baseUrl}}/api/auth/google
+Content-Type: application/json
+
+{
+  "idToken": "YOUR_GOOGLE_ID_TOKEN_HERE"
+}
+
+### 4. Lấy thông tin Profile
+GET {{baseUrl}}/api/auth/profile
+Authorization: Bearer {{token}}
+
+### 5. Cập nhật Profile (Đổi tên, mục tiêu...)
+PUT {{baseUrl}}/api/auth/profile
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "displayName": "Test User Mới",
+  "targetGoal": "TOEIC",
+  "level": 5
+}

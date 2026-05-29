@@ -7,6 +7,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Header
+import com.example.minlishapp.BuildConfig
 
 interface StatsApiService {
     @GET("api/stats/dashboard")
@@ -22,7 +23,10 @@ class StatsRepository(private val apiService: StatsApiService) {
     }
 
     companion object {
-        private const val BASE_URL = "http://10.0.2.2:3000/" // Android Emulator loopback to localhost of host machine
+        private const val DEFAULT_BASE_URL = "http://10.0.2.2:3000/" // Android emulator loopback to host localhost
+        private val BASE_URL = BuildConfig.API_BACKEND_URL?.let {
+            if (it.endsWith("/")) it else "$it/"
+        } ?: DEFAULT_BASE_URL
 
         fun create(): StatsRepository {
             val logging = HttpLoggingInterceptor().apply {

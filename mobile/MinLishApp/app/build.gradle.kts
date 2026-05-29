@@ -3,6 +3,16 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+import java.util.Properties
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+val apiBackendUrl = localProperties.getProperty("api.backend_url")
+
+
 android {
     namespace = "com.example.minlishapp"
     compileSdk {
@@ -19,6 +29,8 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        buildConfigField("String", "API_BACKEND_URL", if (apiBackendUrl != null) "\"$apiBackendUrl\"" else "null")
     }
 
     buildTypes {
@@ -36,6 +48,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -62,4 +75,7 @@ dependencies {
     implementation(libs.retrofit.converter.gson)
     implementation(libs.okhttp.core)
     implementation(libs.okhttp.logging.interceptor)
+
+    // Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
 }

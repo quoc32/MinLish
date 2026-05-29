@@ -22,7 +22,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.minlishapp.data.UserProgress
+import com.example.minlishapp.data.ProfileUpdateRequest
+import com.example.minlishapp.data.TokenManager
+import com.example.minlishapp.data.repository.AuthRepository
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen(
@@ -35,11 +39,40 @@ fun ProfileScreen(
     var isEditingName by remember { mutableStateOf(false) }
     var nameInput by remember { mutableStateOf(userProgress.name) }
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val authRepository = remember { AuthRepository.create(context) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    // Tự động tải profile khi vào màn hình
+    LaunchedEffect(Unit) {
+        try {
+            val response = authRepository.getProfile()
+            if (response.isSuccessful) {
+                val profile = response.body()?.data
+                if (profile != null) {
+                    onProgressUpdate(userProgress.copy(
+                        name = profile.displayName ?: userProgress.name,
+                        email = profile.email ?: userProgress.email,
+                        targetGoal = profile.targetGoal,
+                        xp = profile.xp,
+                        level = profile.level,
+                        streak = profile.streak
+                    ))
+                    nameInput = profile.displayName ?: userProgress.name
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore for now, keep current state
+        }
+    }
 
     var dailyReminderEnabled by remember { mutableStateOf(true) }
     var reviewReminderEnabled by remember { mutableStateOf(true) }
     var dailyReminderTime by remember { mutableStateOf("09:00") }
     var showTimePickerDialog by remember { mutableStateOf(false) }
+    var showGoalPicker by remember { mutableStateOf(false) }
+    
+    val goalOptions = listOf("IELTS", "TOEIC", "Giao tiếp", "THPT Quốc gia")
 
     Scaffold(
         bottomBar = { AppBottomBar(currentScreen = Screen.Profile, onNavigate = onNavigate) }
@@ -115,11 +148,25 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(onClick = {
                             if (nameInput.isNotBlank()) {
-                                onProgressUpdate(userProgress.copy(name = nameInput))
-                                isEditingName = false
-                                Toast.makeText(context, "Đã đổi tên thành công!", Toast.LENGTH_SHORT).show()
+                                isLoading = true
+                                coroutineScope.launch {
+                                    try {
+                                        val response = authRepository.updateProfile(ProfileUpdateRequest(displayName = nameInput))
+                                        isLoading = false
+                                        if (response.isSuccessful) {
+                                            onProgressUpdate(userProgress.copy(name = nameInput))
+                                            isEditingName = false
+                                            Toast.makeText(context, "Đã đổi tên thành công!", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Đổi tên thất bại!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        isLoading = false
+                                        Toast.makeText(context, "Lỗi kết nối", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             }
-                        }) {
+                        }, enabled = !isLoading) {
                             Text("Lưu", fontWeight = FontWeight.Bold)
                         }
                     } else {
@@ -143,6 +190,14 @@ fun ProfileScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
+                        }
+                        if (userProgress.email.isNotEmpty()) {
+                            Text(
+                                text = userProgress.email,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                            )
                         }
                         Text(
                             text = "Học viên Cấp độ ${userProgress.level}",
@@ -195,7 +250,7 @@ fun ProfileScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onNavigate(Screen.OnboardingGoals) }
+                            .clickable { showGoalPicker = true }
                             .padding(horizontal = 16.dp, vertical = 16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -370,6 +425,7 @@ fun ProfileScreen(
                     .fillMaxWidth()
                     .padding(top = 20.dp)
                     .clickable {
+                        TokenManager.getInstance(context).clearToken()
                         onProgressUpdate(UserProgress())
                         Toast.makeText(context, "Đăng xuất thành công!", Toast.LENGTH_SHORT).show()
                         onNavigate(Screen.Welcome)
@@ -527,6 +583,76 @@ fun ProfileScreen(
                             ) {
                                 Text("Đóng")
                             }
+                        }
+                    }
+                }
+            }
+        }
+        // Goal Picker Dialog
+        if (showGoalPicker) {
+            Dialog(onDismissRequest = { showGoalPicker = false }) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Thay đổi mục tiêu học",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            goalOptions.forEach { goal ->
+                                val isSelected = userProgress.targetGoal == goal
+                                Card(
+                                    onClick = {
+                                        showGoalPicker = false
+                                        isLoading = true
+                                        coroutineScope.launch {
+                                            try {
+                                                val response = authRepository.updateProfile(ProfileUpdateRequest(targetGoal = goal))
+                                                isLoading = false
+                                                if (response.isSuccessful) {
+                                                    onProgressUpdate(userProgress.copy(targetGoal = goal))
+                                                    Toast.makeText(context, "Đã cập nhật mục tiêu học!", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "Cập nhật thất bại!", Toast.LENGTH_SHORT).show()
+                                                }
+                                            } catch (e: Exception) {
+                                                isLoading = false
+                                                Toast.makeText(context, "Lỗi kết nối", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    ),
+                                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = goal,
+                                        modifier = Modifier.padding(16.dp),
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                        
+                        TextButton(
+                            onClick = { showGoalPicker = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Đóng", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
