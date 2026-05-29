@@ -9,7 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,212 +19,319 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.minlishapp.ui.theme.*
+import com.example.minlishapp.data.*
+import com.example.minlishapp.data.repository.StatsRepository
+import kotlinx.coroutines.launch
+
+// Interface definition for UI states
+sealed interface StatsUiState {
+    object Loading : StatsUiState
+    data class Success(val data: DashboardData) : StatsUiState
+    data class Error(val message: String) : StatsUiState
+}
 
 @Composable
 fun StatsScreen(onNavigate: (Screen) -> Unit) {
+    val statsRepository = remember { StatsRepository.create() }
+    var uiState by remember { mutableStateOf<StatsUiState>(StatsUiState.Loading) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Mock Bearer JWT Token for authMiddleware validation
+    val mockToken = "Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6IjZmMjM0ZTI4LWFmNTgtNGU4OS1iZWYxLWNmZjRjMGQxZDNhNSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2F5dHdndXNodWFteXlzcmpiZ2pyLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJiNjQzNjFjYS03MTlkLTRhMDctYjUwZi05MTBkOGUwNWY5ZGEiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzgwMDI2MTg1LCJpYXQiOjE3ODAwMjI1ODUsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJzdWIiOiJiNjQzNjFjYS03MTlkLTRhMDctYjUwZi05MTBkOGUwNWY5ZGEifSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc4MDAyMjU4NX1dLCJzZXNzaW9uX2lkIjoiNzNlM2Y2MWYtMGE3Mi00ZjZmLTg1MzAtODFiM2I2NTljYTExIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.Kmpnm29MjT-fAt51GXPiPzJMbChvRnJ4GdsZT9P852ToAKVRZrFK2_-F_V4Rc--ax5w4SB5Zaq_Py8hF5DT53A"
+
+    fun fetchStats() {
+        coroutineScope.launch {
+            uiState = StatsUiState.Loading
+            try {
+                val response = statsRepository.getStatsDashboard(mockToken)
+                if (response.success && response.data != null) {
+                    uiState = StatsUiState.Success(response.data)
+                } else {
+                    uiState = StatsUiState.Error(response.message ?: "Không thể tải dữ liệu thống kê")
+                }
+            } catch (e: Exception) {
+                uiState = StatsUiState.Error("Lỗi kết nối: ${e.localizedMessage ?: "Không thể kết nối đến máy chủ"}")
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        fetchStats()
+    }
+
+    StatsScreenContent(
+        uiState = uiState,
+        onNavigate = onNavigate,
+        onRetry = { fetchStats() }
+    )
+}
+
+@Composable
+fun StatsScreenContent(
+    uiState: StatsUiState,
+    onNavigate: (Screen) -> Unit,
+    onRetry: () -> Unit
+) {
     Scaffold(
         bottomBar = { AppBottomBar(currentScreen = Screen.Stats, onNavigate = onNavigate) }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                text = "Thống Kê",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            // Khung tổng quan
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceAround
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "📚", fontSize = 20.sp)
-                        Text(text = "520", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
-                        Text(text = "Tổng từ đã học", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "🔥", fontSize = 20.sp)
-                        Text(text = "15 ngày", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = ColorStreakFlame)
-                        Text(text = "Streak cao nhất", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "⚡", fontSize = 20.sp)
-                        Text(text = "95%", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = ColorEasy)
-                        Text(text = "Tỷ lệ nhớ lâu", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+            when (val state = uiState) {
+                is StatsUiState.Loading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Biểu đồ 1: Hoạt động học tuần qua (Canvas Bar Chart)
-            Text(
-                text = "Số từ ôn tập hằng ngày",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            val weekData = listOf(
-                "T2" to 15,
-                "T3" to 22,
-                "T4" to 8,
-                "T5" to 30,
-                "T6" to 25,
-                "T7" to 12,
-                "CN" to 18
-            )
-
-            val barColor = MaterialTheme.colorScheme.primary
-            val outlineColor = MaterialTheme.colorScheme.outline
-
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Canvas(
+                is StatsUiState.Error -> {
+                    Column(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
+                            .align(Alignment.Center)
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        val maxVal = 35f
-                        val widthGap = size.width / (weekData.size)
-                        val barWidth = 24.dp.toPx()
-
-                        // Vẽ đường tham chiếu phụ ngang
-                        drawLine(
-                            color = outlineColor.copy(alpha = 0.5f),
-                            start = Offset(0f, size.height * 0.5f),
-                            end = Offset(size.width, size.height * 0.5f),
-                            strokeWidth = 1.dp.toPx()
+                        Text(text = "⚠️", fontSize = 48.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = state.message,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(bottom = 16.dp)
                         )
-
-                        weekData.forEachIndexed { index, (_, value) ->
-                            val left = index * widthGap + (widthGap - barWidth) / 2
-                            val barHeight = (value / maxVal) * size.height
-                            val top = size.height - barHeight
-
-                            // Vẽ cột bo góc nhẹ
-                            drawRoundRect(
-                                color = barColor,
-                                topLeft = Offset(left, top),
-                                size = Size(barWidth, barHeight),
-                                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Vẽ nhãn ngày ở trục X
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        weekData.forEach { (day, _) ->
-                            Text(
-                                text = day,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Button(onClick = onRetry) {
+                            Text("Thử lại")
                         }
                     }
                 }
-            }
+                is StatsUiState.Success -> {
+                    val dashboardData = state.data
+                    val profile = dashboardData.profile
+                    val donut = dashboardData.donutChart
+                    val barData = dashboardData.barChart
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Biểu đồ 2: Đồ thị tròn tỷ lệ nhớ (Donut Chart)
-            Text(
-                text = "Tỷ lệ trạng thái từ vựng",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Canvas Donut Chart
-                    Box(
-                        modifier = Modifier.size(110.dp),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                            .verticalScroll(rememberScrollState())
                     ) {
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val stroke = Stroke(width = 16.dp.toPx())
-                            // Vẽ 3 cung tròn: Đã thuộc (60%), Đang ôn (30%), Học lại (10%)
-                            drawArc(
-                                color = ColorEasy, // Xanh lá
-                                startAngle = -90f,
-                                sweepAngle = 216f,
-                                useCenter = false,
-                                style = stroke
-                            )
-                            drawArc(
-                                color = ColorGood, // Xanh dương
-                                startAngle = 126f,
-                                sweepAngle = 108f,
-                                useCenter = false,
-                                style = stroke
-                            )
-                            drawArc(
-                                color = ColorAgain, // Đỏ
-                                startAngle = 234f,
-                                sweepAngle = 36f,
-                                useCenter = false,
-                                style = stroke
-                            )
-                        }
                         Text(
-                            text = "520 từ",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            text = "Thống Kê",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 16.dp)
                         )
-                    }
 
-                    Spacer(modifier = Modifier.width(24.dp))
+                        // Khung tổng quan động
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceAround
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(text = "📚", fontSize = 20.sp)
+                                    Text(text = "${donut.totalStudied}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                                    Text(text = "Tổng từ đã học", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(text = "🔥", fontSize = 20.sp)
+                                    Text(text = "${profile.streak} ngày", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = ColorStreakFlame)
+                                    Text(text = "Streak hiện tại", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(text = "⚡", fontSize = 20.sp)
+                                    val displayedRetentionRate = if (profile.retentionRate > 1.0) {
+                                        profile.retentionRate.toInt()
+                                    } else {
+                                        (profile.retentionRate * 100).toInt()
+                                    }
+                                    Text(text = "$displayedRetentionRate%", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = ColorEasy)
+                                    Text(text = "Tỷ lệ nhớ lâu", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
 
-                    // Chú thích
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        LegendRow(color = ColorEasy, label = "Thành thạo (60%)")
-                        LegendRow(color = ColorGood, label = "Đang nhớ (30%)")
-                        LegendRow(color = ColorAgain, label = "Cần ôn gấp (10%)")
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Biểu đồ 1: Hoạt động học tuần qua (Canvas Bar Chart nhận dữ liệu động)
+                        Text(
+                            text = "Số từ ôn tập hằng ngày",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+
+                        val barColor = MaterialTheme.colorScheme.primary
+                        val outlineColor = MaterialTheme.colorScheme.outline
+
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Canvas(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth()
+                                ) {
+                                    val maxVal = (barData.maxOfOrNull { it.wordsCount } ?: 10).toFloat().coerceAtLeast(10f)
+                                    val widthGap = size.width / (barData.size)
+                                    val barWidth = 24.dp.toPx()
+
+                                    // Vẽ đường tham chiếu phụ ngang ở giữa (50%)
+                                    drawLine(
+                                        color = outlineColor.copy(alpha = 0.5f),
+                                        start = Offset(0f, size.height * 0.5f),
+                                        end = Offset(size.width, size.height * 0.5f),
+                                        strokeWidth = 1.dp.toPx()
+                                    )
+
+                                    barData.forEachIndexed { index, barItem ->
+                                        val left = index * widthGap + (widthGap - barWidth) / 2
+                                        val barHeight = (barItem.wordsCount / maxVal) * size.height
+                                        val top = size.height - barHeight
+
+                                        // Chỉ vẽ khi cột có chiều cao
+                                        if (barHeight > 0) {
+                                            drawRoundRect(
+                                                color = barColor,
+                                                topLeft = Offset(left, top),
+                                                size = Size(barWidth, barHeight),
+                                                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Vẽ nhãn ngày thực tế ở trục X
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceAround
+                                ) {
+                                    barData.forEach { barItem ->
+                                        Text(
+                                            text = barItem.label,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Biểu đồ 2: Đồ thị tròn tỷ lệ nhớ (Donut Chart nhận dữ liệu động)
+                        Text(
+                            text = "Tỷ lệ trạng thái từ vựng",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val total = donut.totalStudied.toFloat().coerceAtLeast(1f)
+                                val sweepEasy = (donut.proficient / total) * 360f
+                                val sweepGood = (donut.learning / total) * 360f
+                                val sweepAgain = (donut.needsReview / total) * 360f
+
+                                val pctEasy = ((donut.proficient / total) * 100).toInt()
+                                val pctGood = ((donut.learning / total) * 100).toInt()
+                                val pctAgain = ((donut.needsReview / total) * 100).toInt()
+
+                                // Canvas Donut Chart
+                                Box(
+                                    modifier = Modifier.size(110.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        val stroke = Stroke(width = 16.dp.toPx())
+                                        var startAngle = -90f
+
+                                        if (sweepEasy > 0) {
+                                            drawArc(
+                                                color = ColorEasy, // Xanh lá
+                                                startAngle = startAngle,
+                                                sweepAngle = sweepEasy,
+                                                useCenter = false,
+                                                style = stroke
+                                            )
+                                            startAngle += sweepEasy
+                                        }
+                                        if (sweepGood > 0) {
+                                            drawArc(
+                                                color = ColorGood, // Xanh dương
+                                                startAngle = startAngle,
+                                                sweepAngle = sweepGood,
+                                                useCenter = false,
+                                                style = stroke
+                                            )
+                                            startAngle += sweepGood
+                                        }
+                                        if (sweepAgain > 0) {
+                                            drawArc(
+                                                color = ColorAgain, // Đỏ
+                                                startAngle = startAngle,
+                                                sweepAngle = sweepAgain,
+                                                useCenter = false,
+                                                style = stroke
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = "${donut.totalStudied} từ",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(24.dp))
+
+                                // Chú thích động với tỉ lệ thực tế
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    LegendRow(color = ColorEasy, label = "Thành thạo (${pctEasy}%)")
+                                    LegendRow(color = ColorGood, label = "Đang nhớ (${pctGood}%)")
+                                    LegendRow(color = ColorAgain, label = "Cần ôn gấp (${pctAgain}%)")
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -246,6 +353,44 @@ fun LegendRow(color: Color, label: String) {
             text = label,
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun StatsScreenPreview() {
+    val sampleDashboardData = DashboardData(
+        profile = ProfileStats(
+            xp = 1248,
+            level = 12,
+            streak = 15,
+            maxStreak = 30,
+            targetGoal = "IELTS",
+            retentionRate = 0.85
+        ),
+        donutChart = DonutChartData(
+            learning = 45,
+            proficient = 120,
+            needsReview = 15,
+            totalStudied = 180
+        ),
+        barChart = listOf(
+            BarChartData("2023-10-01", "Mon", 12),
+            BarChartData("2023-10-02", "Tue", 18),
+            BarChartData("2023-10-03", "Wed", 8),
+            BarChartData("2023-10-04", "Thu", 25),
+            BarChartData("2023-10-05", "Fri", 15),
+            BarChartData("2023-10-06", "Sat", 30),
+            BarChartData("2023-10-07", "Sun", 20)
+        )
+    )
+
+    MinLishAppTheme {
+        StatsScreenContent(
+            uiState = StatsUiState.Success(sampleDashboardData),
+            onNavigate = {},
+            onRetry = {}
         )
     }
 }
