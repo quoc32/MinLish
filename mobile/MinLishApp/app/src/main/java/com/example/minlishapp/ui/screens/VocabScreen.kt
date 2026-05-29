@@ -45,7 +45,8 @@ fun VocabScreen(
     userProgress: UserProgress,
     activeDeck: Deck?,
     onActiveDeckSelect: (Deck) -> Unit,
-    onAddWordToDeck: (String, com.example.minlishapp.data.Word) -> Unit
+    onAddWordToDeck: (String, com.example.minlishapp.data.Word) -> Unit,
+    onStartStudy: (Deck) -> Unit = {}
 ) {
     val context = LocalContext.current
     var showDialog by remember { mutableStateOf(false) }
@@ -267,7 +268,7 @@ fun VocabScreen(
 
                                     // Subtitle
                                     Text(
-                                        text = "${deck.words.size} từ vựng",
+                                        text = "${deck.wordCount} từ vựng",
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -302,8 +303,7 @@ fun VocabScreen(
                                         val buttonColor = Color(0xFF10B981)
                                         OutlinedButton(
                                             onClick = {
-                                                onActiveDeckSelect(deck)
-                                                onNavigate(Screen.Flashcards)
+                                                onStartStudy(deck)
                                             },
                                             shape = RoundedCornerShape(12.dp),
                                             border = BorderStroke(1.dp, buttonColor),
@@ -475,123 +475,138 @@ fun VocabScreen(
                     Column(
                         modifier = Modifier
                             .padding(20.dp)
-                            .heightIn(max = 480.dp)
-                            .verticalScroll(rememberScrollState()),
+                            .fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Text(
-                            text = "Thêm Từ Vựng Vào Bộ",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            text = "Bộ từ: ${selectedDeckForAddingWord?.name}",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        // 1. Từ vựng
-                        OutlinedTextField(
-                            value = newWordText,
-                            onValueChange = { newWordText = it },
-                            label = { Text("Từ tiếng Anh (*)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        // 2. Loại từ (adjective, noun, verb...)
-                        Text(text = "Loại từ:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Row(
+                        // Sticky Header
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            listOf("verb" to "Động từ", "noun" to "Danh từ", "adjective" to "Tính từ", "adverb" to "Trạng từ").forEach { (typeKey, label) ->
-                                val isSel = newWordType == typeKey
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(
-                                            if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                        )
-                                        .border(
-                                            1.dp,
-                                            if (isSel) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable { newWordType = typeKey }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSel) MaterialTheme.colorScheme.primary else Color.Gray
-                                    )
-                                }
-                            }
+                            Text(
+                                text = "Thêm Từ Vựng Vào Bộ",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                text = "Bộ từ: ${selectedDeckForAddingWord?.name}",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
 
-                        // 3. Phiên âm
-                        OutlinedTextField(
-                            value = newWordPron,
-                            onValueChange = { newWordPron = it },
-                            label = { Text("Phiên âm UK (*)") },
-                            placeholder = { Text("Ví dụ: /ə'kɒmədeɪt/") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        // Scrollable Body Content
+                        Column(
+                            modifier = Modifier
+                                .weight(weight = 1f, fill = false)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            // 1. Từ vựng
+                            OutlinedTextField(
+                                value = newWordText,
+                                onValueChange = { newWordText = it },
+                                label = { Text("Từ tiếng Anh (*)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                        // 4. Nghĩa tiếng Việt
-                        OutlinedTextField(
-                            value = newWordMeaning,
-                            onValueChange = { newWordMeaning = it },
-                            label = { Text("Nghĩa tiếng Việt (*)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            // 2. Loại từ (adjective, noun, verb...)
+                            Text(text = "Loại từ:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf("verb" to "Động từ", "noun" to "Danh từ", "adjective" to "Tính từ", "adverb" to "Trạng từ").forEach { (typeKey, label) ->
+                                    val isSel = newWordType == typeKey
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(
+                                                if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (isSel) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable { newWordType = typeKey }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSel) MaterialTheme.colorScheme.primary else Color.Gray
+                                        )
+                                    }
+                                }
+                            }
 
-                        // 5. Câu ví dụ tiếng Anh
-                        OutlinedTextField(
-                            value = newWordExample,
-                            onValueChange = { newWordExample = it },
-                            label = { Text("Câu ví dụ tiếng Anh") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            // 3. Phiên âm
+                            OutlinedTextField(
+                                value = newWordPron,
+                                onValueChange = { newWordPron = it },
+                                label = { Text("Phiên âm UK (*)") },
+                                placeholder = { Text("Ví dụ: /ə'kɒmədeɪt/") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                        // 6. Dịch nghĩa câu ví dụ
-                        OutlinedTextField(
-                            value = newWordExampleTrans,
-                            onValueChange = { newWordExampleTrans = it },
-                            label = { Text("Dịch nghĩa câu ví dụ") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            // 4. Nghĩa tiếng Việt
+                            OutlinedTextField(
+                                value = newWordMeaning,
+                                onValueChange = { newWordMeaning = it },
+                                label = { Text("Nghĩa tiếng Việt (*)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                        // 7. Collocations
-                        OutlinedTextField(
-                            value = newWordCollocations,
-                            onValueChange = { newWordCollocations = it },
-                            label = { Text("Collocations (Phân cách bằng dấu phẩy)") },
-                            placeholder = { Text("Ví dụ: accommodate guests, accommodate needs") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            // 5. Câu ví dụ tiếng Anh
+                            OutlinedTextField(
+                                value = newWordExample,
+                                onValueChange = { newWordExample = it },
+                                label = { Text("Câu ví dụ tiếng Anh") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                        // 8. Từ đồng nghĩa
-                        OutlinedTextField(
-                            value = newWordSynonyms,
-                            onValueChange = { newWordSynonyms = it },
-                            label = { Text("Từ đồng nghĩa (Phân cách bằng dấu phẩy)") },
-                            placeholder = { Text("Ví dụ: hold, contain") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            // 6. Dịch nghĩa câu ví dụ
+                            OutlinedTextField(
+                                value = newWordExampleTrans,
+                                onValueChange = { newWordExampleTrans = it },
+                                label = { Text("Dịch nghĩa câu ví dụ") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                        // Buttons
+                            // 7. Collocations
+                            OutlinedTextField(
+                                value = newWordCollocations,
+                                onValueChange = { newWordCollocations = it },
+                                label = { Text("Collocations (Phân cách bằng dấu phẩy)") },
+                                placeholder = { Text("Ví dụ: accommodate guests, accommodate needs") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // 8. Từ đồng nghĩa
+                            OutlinedTextField(
+                                value = newWordSynonyms,
+                                onValueChange = { newWordSynonyms = it },
+                                label = { Text("Từ đồng nghĩa (Phân cách bằng dấu phẩy)") },
+                                placeholder = { Text("Ví dụ: hold, contain") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        // Sticky Footer Buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)

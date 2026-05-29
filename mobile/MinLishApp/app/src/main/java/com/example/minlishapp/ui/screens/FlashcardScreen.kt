@@ -37,7 +37,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun FlashcardScreen(
     activeDeck: Deck?,
-    onNavigate: (Screen) -> Unit
+    onNavigate: (Screen) -> Unit,
+    onSubmitReview: (cardId: String, quality: String) -> Unit
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -760,11 +761,15 @@ fun FlashcardScreen(
                                                 
                                                 Card(
                                                     onClick = {
+                                                        onSubmitReview(currentWord.id, "again")
                                                         val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optAgain.score)
                                                         currentWord.repetitions = res.first
                                                         currentWord.easeFactor = res.second
                                                         currentWord.intervalDays = res.third
                                                         
+                                                        // Thêm từ hiện tại vào cuối danh sách để học lại trong phiên
+                                                        studyWords.add(currentWord.copy())
+
                                                         // Chuyển từ tiếp theo
                                                         isFlipped = false
                                                         currentStep = 1
@@ -787,6 +792,7 @@ fun FlashcardScreen(
                                                 
                                                 Card(
                                                     onClick = {
+                                                        onSubmitReview(currentWord.id, "hard")
                                                         val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optHard.score)
                                                         currentWord.repetitions = res.first
                                                         currentWord.easeFactor = res.second
@@ -823,6 +829,7 @@ fun FlashcardScreen(
                                                 
                                                 Card(
                                                     onClick = {
+                                                        onSubmitReview(currentWord.id, "good")
                                                         val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optGood.score)
                                                         currentWord.repetitions = res.first
                                                         currentWord.easeFactor = res.second
@@ -850,6 +857,7 @@ fun FlashcardScreen(
                                                 
                                                 Card(
                                                     onClick = {
+                                                        onSubmitReview(currentWord.id, "easy")
                                                         val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optEasy.score)
                                                         currentWord.repetitions = res.first
                                                         currentWord.easeFactor = res.second

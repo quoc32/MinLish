@@ -9,17 +9,30 @@ async function getDailyPlan(req, res) {
   try {
     const userId = req.user.id;
 
-    // 1. Fetch all decks and their unlocking status to identify which are unlocked
+    // 1. Fetch user profile to get words_per_day and target_goal setting
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('words_per_day, target_goal')
+      .eq('id', userId)
+      .single();
+
+    const wordsPerDay = (profile && profile.words_per_day) ? profile.words_per_day : 20;
+    const targetGoal = (profile && profile.target_goal) ? profile.target_goal : 'IELTS';
+
+    // 2. Fetch decks belonging to the user's target_goal (both system sample decks and user's custom decks)
     const { data: decks, error: decksError } = await supabase
       .from('decks')
       .select(`
         id,
         order_index,
+        target_goal,
         deck_progress (
           is_unlocked,
           user_id
         )
       `)
+      .eq('target_goal', targetGoal)
+      .or(`user_id.is.null,user_id.eq.${userId}`)
       .order('order_index', { ascending: true });
 
     if (decksError) {
@@ -43,11 +56,19 @@ async function getDailyPlan(req, res) {
     if (unlockedDeckIds.length === 0) {
       return res.status(200).json({
         success: true,
-        data: { newCards: [], reviewCards: [] }
+        data: {
+          wordsPerDay,
+          newCardsCount: 0,
+          reviewCardsCount: 0,
+          inSessionReviewCount: 0,
+          newCards: [],
+          reviewCards: [],
+          inSessionReviewCards: []
+        }
       });
     }
 
-    // 2. Fetch all cards in the unlocked decks
+    // 3. Fetch all cards in the unlocked decks
     const { data: cards, error: cardsError } = await supabase
       .from('cards')
       .select('*')
@@ -61,7 +82,7 @@ async function getDailyPlan(req, res) {
       });
     }
 
-    // 3. Fetch all word progress records for the user
+    // 4. Fetch all word progress records for the user
     const { data: progressRecords, error: progressError } = await supabase
       .from('word_progress')
       .select('*')
@@ -81,24 +102,41 @@ async function getDailyPlan(req, res) {
       progressMap.set(rec.card_id, rec);
     });
 
-    const newCards = [];
+    const allNewCards = [];
     const reviewCards = [];
+    const inSessionReviewCards = [];
     const now = new Date();
 
-    // 4. Split cards into New and Due Review
+    // 5. Split cards into New, Due Review, and In-Session Review
     cards.forEach(card => {
       const progress = progressMap.get(card.id);
 
       if (!progress) {
         // User has never reviewed this card before
-        newCards.push({
+        allNewCards.push({
           ...card,
           progress: null
         });
       } else {
         const nextReviewDate = new Date(progress.next_review);
-        if (nextReviewDate <= now || progress.status === 'needs_review') {
-          // Card review is due or flagged as needing review
+        const isDue = nextReviewDate <= now;
+        const needsReview = progress.status === 'needs_review';
+
+        if (needsReview && progress.interval === 0) {
+          // Intra-session review: cards marked "again" with short interval
+          // These should be reviewed within the current study session
+          inSessionReviewCards.push({
+            ...card,
+            progress: {
+              status: progress.status,
+              ease_factor: parseFloat(progress.ease_factor),
+              interval: progress.interval,
+              repetitions: progress.repetitions,
+              next_review: progress.next_review
+            }
+          });
+        } else if (isDue || needsReview) {
+          // Regular due review: cards whose next_review date has passed
           reviewCards.push({
             ...card,
             progress: {
@@ -113,13 +151,20 @@ async function getDailyPlan(req, res) {
       }
     });
 
+    // 6. Limit new cards to user's wordsPerDay setting
+    const newCards = allNewCards.slice(0, wordsPerDay);
+
     res.status(200).json({
       success: true,
       data: {
+        wordsPerDay,
         newCardsCount: newCards.length,
         reviewCardsCount: reviewCards.length,
+        inSessionReviewCount: inSessionReviewCards.length,
+        totalNewCardsAvailable: allNewCards.length,
         newCards,
-        reviewCards
+        reviewCards,
+        inSessionReviewCards
       }
     });
   } catch (err) {
@@ -275,19 +320,21 @@ async function submitReview(req, res) {
     let nextDeckName = '';
 
     if (progressValue >= 1.00) {
-      // Find current deck's order_index
+      // Find current deck's order_index and target goal info
       const { data: currentDeck } = await supabase
         .from('decks')
-        .select('order_index')
+        .select('order_index, target_goal, user_id')
         .eq('id', deckId)
         .single();
 
       if (currentDeck) {
-        // Query next deck in sequence
+        // Query next deck in sequence, matching target goal and ownership
         const { data: nextDeck } = await supabase
           .from('decks')
           .select('id, name')
           .eq('order_index', currentDeck.order_index + 1)
+          .eq('target_goal', currentDeck.target_goal)
+          .or(`user_id.is.null,user_id.eq.${userId}`)
           .maybeSingle();
 
         if (nextDeck) {
@@ -417,6 +464,7 @@ async function submitReview(req, res) {
         sm2: {
           ease_factor: sm2Result.ease_factor,
           interval: sm2Result.interval,
+          interval_minutes: sm2Result.interval_minutes,
           repetitions: sm2Result.repetitions,
           status: sm2Result.status,
           next_review: sm2Result.next_review

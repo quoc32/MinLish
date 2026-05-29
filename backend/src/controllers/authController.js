@@ -6,7 +6,7 @@ const { supabase } = require('../config/supabase');
  */
 async function register(req, res) {
   try {
-    const { email, password, displayName, targetGoal } = req.body;
+    const { email, password, displayName, targetGoal, wordsPerDay } = req.body;
 
     if (!email || !password || !displayName) {
       return res.status(400).json({
@@ -38,6 +38,7 @@ async function register(req, res) {
           id: userId,
           display_name: displayName,
           target_goal: targetGoal || null,
+          words_per_day: wordsPerDay ? parseInt(wordsPerDay, 10) : 20,
           level: 1,
           xp: 0,
           streak: 0,
@@ -176,6 +177,7 @@ async function loginWithGoogle(req, res) {
             id: userId,
             display_name: displayName,
             target_goal: 'IELTS',
+            words_per_day: 20,
             level: 1,
             xp: 0,
             streak: 0,
@@ -252,7 +254,7 @@ async function getProfile(req, res) {
 async function updateProfile(req, res) {
   try {
     const userId = req.user.id;
-    const { displayName, targetGoal, level, xp, streak, maxStreak } = req.body;
+    const { displayName, targetGoal, level, xp, streak, maxStreak, wordsPerDay } = req.body;
 
     // Prepare update payload dynamically
     const updates = {};
@@ -262,6 +264,7 @@ async function updateProfile(req, res) {
     if (xp !== undefined) updates.xp = parseInt(xp, 10);
     if (streak !== undefined) updates.streak = parseInt(streak, 10);
     if (maxStreak !== undefined) updates.max_streak = parseInt(maxStreak, 10);
+    if (wordsPerDay !== undefined) updates.words_per_day = parseInt(wordsPerDay, 10);
 
     updates.updated_at = new Date().toISOString();
 

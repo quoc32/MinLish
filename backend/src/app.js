@@ -9,6 +9,7 @@ const deckRoutes = require('./routes/deckRoutes');
 const learnRoutes = require('./routes/learnRoutes');
 const statRoutes = require('./routes/statRoutes');
 const notifyRoutes = require('./routes/notifyRoutes');
+const cardRoutes = require('./routes/cardRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,6 +34,7 @@ app.use('/api/decks', deckRoutes);
 app.use('/api/learning', learnRoutes);
 app.use('/api/stats', statRoutes);
 app.use('/api/notifications', notifyRoutes);
+app.use('/api/cards', cardRoutes);
 
 // Safe Catch-All 404 Not Found Middleware
 app.use((req, res, next) => {

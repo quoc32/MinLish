@@ -8,7 +8,16 @@ async function getAllDecks(req, res) {
   try {
     const userId = req.user.id;
 
-    // Fetch decks and their progress rows for this user
+    // Fetch user's target goal
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('target_goal')
+      .eq('id', userId)
+      .single();
+
+    const targetGoal = profile ? profile.target_goal : 'IELTS';
+
+    // Fetch decks for this specific goal (both system sample decks and user's custom decks)
     const { data: decks, error } = await supabase
       .from('decks')
       .select(`
@@ -19,12 +28,16 @@ async function getAllDecks(req, res) {
         total_words,
         order_index,
         created_at,
+        target_goal,
+        user_id,
         deck_progress (
           progress,
           is_unlocked,
           user_id
         )
       `)
+      .eq('target_goal', targetGoal)
+      .or(`user_id.is.null,user_id.eq.${userId}`)
       .order('order_index', { ascending: true });
 
     if (error) {
@@ -89,7 +102,7 @@ async function getDeckCards(req, res) {
     // 1. Verify deck exists
     const { data: deck, error: deckError } = await supabase
       .from('decks')
-      .select('id, name')
+      .select('id, name, user_id')
       .eq('id', deckId)
       .single();
 
@@ -97,6 +110,14 @@ async function getDeckCards(req, res) {
       return res.status(404).json({
         success: false,
         message: 'Deck not found.'
+      });
+    }
+
+    // Check ownership of custom deck
+    if (deck.user_id && deck.user_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. This deck belongs to another user.'
       });
     }
 
@@ -170,5 +191,223 @@ async function getDeckCards(req, res) {
 
 module.exports = {
   getAllDecks,
-  getDeckCards
+  getDeckCards,
+  createDeck,
+  updateDeck,
+  deleteDeck
 };
+
+/**
+ * Create a new deck
+ * POST /api/decks
+ */
+async function createDeck(req, res) {
+  try {
+    const userId = req.user.id;
+    const { name, icon, tag } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Deck name is required.'
+      });
+    }
+
+    // 1. Fetch user's target goal
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('target_goal')
+      .eq('id', userId)
+      .single();
+
+    const targetGoal = profile ? profile.target_goal : 'IELTS';
+
+    // 2. Determine the next order_index within this goal
+    const { data: lastDeck } = await supabase
+      .from('decks')
+      .select('order_index')
+      .eq('target_goal', targetGoal)
+      .order('order_index', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nextOrderIndex = lastDeck ? lastDeck.order_index + 1 : 1;
+
+    // 3. Insert the new deck with target_goal and owner user_id
+    const { data: newDeck, error: insertError } = await supabase
+      .from('decks')
+      .insert({
+        name: name.trim(),
+        icon: icon || '📚',
+        tag: tag || null,
+        total_words: 0,
+        order_index: nextOrderIndex,
+        target_goal: targetGoal,
+        user_id: userId
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to create deck.',
+        error: insertError.message
+      });
+    }
+
+    // 3. Auto-create deck_progress for the creating user (unlocked)
+    await supabase
+      .from('deck_progress')
+      .insert({
+        user_id: userId,
+        deck_id: newDeck.id,
+        progress: 0.00,
+        is_unlocked: true
+      });
+
+    res.status(201).json({
+      success: true,
+      message: 'Deck created successfully.',
+      data: {
+        ...newDeck,
+        progress: 0.00,
+        is_unlocked: true
+      }
+    });
+  } catch (err) {
+    console.error('Create deck API error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error creating deck.'
+    });
+  }
+}
+
+/**
+ * Update an existing deck
+ * PUT /api/decks/:id
+ */
+async function updateDeck(req, res) {
+  try {
+    const deckId = req.params.id;
+    const { name, icon, tag } = req.body;
+
+    if (!deckId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Deck ID is required.'
+      });
+    }
+
+    // Build update payload dynamically
+    const updates = {};
+    if (name !== undefined) updates.name = name.trim();
+    if (icon !== undefined) updates.icon = icon;
+    if (tag !== undefined) updates.tag = tag;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one field (name, icon, tag) is required to update.'
+      });
+    }
+
+    const { data: updatedDeck, error } = await supabase
+      .from('decks')
+      .update(updates)
+      .eq('id', deckId)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to update deck.',
+        error: error.message
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Deck updated successfully.',
+      data: updatedDeck
+    });
+  } catch (err) {
+    console.error('Update deck API error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error updating deck.'
+    });
+  }
+}
+
+/**
+ * Delete a deck and all related data (cascade)
+ * DELETE /api/decks/:id
+ */
+async function deleteDeck(req, res) {
+  try {
+    const deckId = req.params.id;
+
+    if (!deckId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Deck ID is required.'
+      });
+    }
+
+    // 1. Fetch all card IDs in this deck (needed for cascade cleanup)
+    const { data: deckCards } = await supabase
+      .from('cards')
+      .select('id')
+      .eq('deck_id', deckId);
+
+    const cardIds = deckCards ? deckCards.map(c => c.id) : [];
+
+    // 2. Cascade delete: word_progress for these cards
+    if (cardIds.length > 0) {
+      await supabase
+        .from('word_progress')
+        .delete()
+        .in('card_id', cardIds);
+    }
+
+    // 3. Cascade delete: all cards in this deck
+    await supabase
+      .from('cards')
+      .delete()
+      .eq('deck_id', deckId);
+
+    // 4. Cascade delete: deck_progress for all users
+    await supabase
+      .from('deck_progress')
+      .delete()
+      .eq('deck_id', deckId);
+
+    // 5. Delete the deck itself
+    const { error: deleteError } = await supabase
+      .from('decks')
+      .delete()
+      .eq('id', deckId);
+
+    if (deleteError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to delete deck.',
+        error: deleteError.message
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Deck and all related data deleted successfully.'
+    });
+  } catch (err) {
+    console.error('Delete deck API error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error deleting deck.'
+    });
+  }
+}

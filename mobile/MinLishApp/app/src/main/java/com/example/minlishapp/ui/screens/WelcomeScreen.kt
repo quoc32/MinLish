@@ -111,8 +111,11 @@ fun WelcomeScreen(
                                     profile?.level ?: 1,
                                     profile?.streak ?: 0
                                 )
-                                Toast.makeText(context, "Đăng nhập Google thành công!", Toast.LENGTH_SHORT).show()
-                                onNavigate(Screen.Dashboard)
+                                if (profile == null) {
+                                    onNavigate(Screen.LanguageSelection)
+                                } else {
+                                    onNavigate(Screen.Dashboard)
+                                }
                             } else {
                                 errorMessage = body?.message ?: "Đăng nhập Google thất bại!"
                             }

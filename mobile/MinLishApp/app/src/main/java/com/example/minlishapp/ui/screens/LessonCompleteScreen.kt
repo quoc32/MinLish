@@ -22,7 +22,12 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
-fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
+fun LessonCompleteScreen(
+    onNavigate: (Screen) -> Unit,
+    xpGained: Int,
+    streak: Int,
+    accuracy: Int
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -102,7 +107,7 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                 RewardCard(
                     weight = 1f,
                     icon = "⚡",
-                    value = "+50 XP",
+                    value = "+$xpGained XP",
                     label = "Kinh nghiệm",
                     color = ColorGood
                 )
@@ -111,7 +116,7 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                 RewardCard(
                     weight = 1f,
                     icon = "🔥",
-                    value = "16 ngày",
+                    value = "$streak ngày",
                     label = "Chuỗi ngày",
                     color = ColorStreakFlame
                 )
@@ -120,7 +125,7 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                 RewardCard(
                     weight = 1f,
                     icon = "🎯",
-                    value = "100%",
+                    value = "$accuracy%",
                     label = "Chính xác",
                     color = ColorEasy
                 )
