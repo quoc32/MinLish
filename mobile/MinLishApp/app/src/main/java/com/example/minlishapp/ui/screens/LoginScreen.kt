@@ -26,10 +26,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.minlishapp.data.repository.AuthRepository
+import com.example.minlishapp.data.LoginRequest
+import com.example.minlishapp.data.LoginResponse
+import com.example.minlishapp.data.RegisterRequest
+import kotlinx.coroutines.launch
 
 @Composable
-fun LoginScreen(onNavigate: (Screen) -> Unit) {
+fun LoginScreen(
+    onLoginSuccess: (userId: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
+    onNavigate: (Screen) -> Unit
+) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val authRepository = remember { AuthRepository.create() }
+    var isLoading by remember { mutableStateOf(false) }
     var isLoginTab by remember { mutableStateOf(true) }
     
     // Form fields
@@ -43,14 +54,6 @@ fun LoginScreen(onNavigate: (Screen) -> Unit) {
     
     // Validation Error Message
     var errorMessage by remember { mutableStateOf("") }
-    
-    // Google Accounts Dialog Mock
-    var showGoogleAccountPicker by remember { mutableStateOf(false) }
-    val mockGoogleAccounts = listOf(
-        Pair("Nguyen Van A", "nva@gmail.com"),
-        Pair("Tran Thi B", "ttb@gmail.com"),
-        Pair("MinLish Student", "student@minlish.edu.vn")
-    )
 
     Box(
         modifier = Modifier
@@ -258,143 +261,111 @@ fun LoginScreen(onNavigate: (Screen) -> Unit) {
                     } else if (!isLoginTab && password != confirmPassword) {
                         errorMessage = "Mật khẩu xác nhận không khớp!"
                     } else {
-                        Toast.makeText(context, if (isLoginTab) "Đăng nhập thành công!" else "Tạo tài khoản thành công!", Toast.LENGTH_SHORT).show()
-                        onNavigate(Screen.LanguageSelection)
+                        if (isLoginTab) {
+                            isLoading = true
+                            coroutineScope.launch {
+                                try {
+                                    val response = authRepository.login(LoginRequest(email, password))
+                                    isLoading = false
+                                    if (response.isSuccessful) {
+                                        val body = response.body()
+                                        if (body != null && body.success && body.data != null) {
+                                            val profile = body.data.profile
+                                            val userId = body.data.user.id
+                                            onLoginSuccess(
+                                                userId,
+                                                profile?.displayName ?: "Học viên",
+                                                profile?.targetGoal ?: "IELTS",
+                                                profile?.xp ?: 0,
+                                                profile?.level ?: 1,
+                                                profile?.streak ?: 0
+                                            )
+                                            Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
+                                            onNavigate(Screen.LanguageSelection)
+                                        } else {
+                                            errorMessage = body?.message ?: "Đăng nhập thất bại!"
+                                        }
+                                    } else {
+                                        val errorJson = response.errorBody()?.string()
+                                        val errorMsg = try {
+                                            com.google.gson.Gson().fromJson(errorJson, LoginResponse::class.java)?.message
+                                        } catch (jsonEx: Exception) {
+                                            null
+                                        }
+                                        errorMessage = errorMsg ?: "Đăng nhập thất bại (Mã lỗi: ${response.code()})"
+                                    }
+                                } catch (e: Exception) {
+                                    isLoading = false
+                                    errorMessage = "Lỗi kết nối: ${e.localizedMessage ?: "Không thể kết nối tới máy chủ"}"
+                                }
+                            }
+                        } else {
+                            isLoading = true
+                            coroutineScope.launch {
+                                try {
+                                    val displayName = email.substringBefore("@").replaceFirstChar { it.uppercase() }
+                                    val response = authRepository.register(
+                                        com.example.minlishapp.data.RegisterRequest(email, password, displayName, "IELTS")
+                                    )
+                                    isLoading = false
+                                    if (response.isSuccessful) {
+                                        val body = response.body()
+                                        if (body != null && body.success && body.data != null) {
+                                            val profile = body.data.profile
+                                            val userId = body.data.user.id
+                                            onLoginSuccess(
+                                                userId,
+                                                profile?.displayName ?: displayName,
+                                                profile?.targetGoal ?: "IELTS",
+                                                profile?.xp ?: 0,
+                                                profile?.level ?: 1,
+                                                profile?.streak ?: 0
+                                            )
+                                            Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
+                                            onNavigate(Screen.LanguageSelection)
+                                        } else {
+                                            errorMessage = body?.message ?: "Đăng ký thất bại!"
+                                        }
+                                    } else {
+                                        val errorJson = response.errorBody()?.string()
+                                        val errorMsg = try {
+                                            com.google.gson.Gson().fromJson(errorJson, LoginResponse::class.java)?.message
+                                        } catch (jsonEx: Exception) {
+                                            null
+                                        }
+                                        errorMessage = errorMsg ?: "Đăng ký thất bại (Mã lỗi: ${response.code()})"
+                                    }
+                                } catch (e: Exception) {
+                                    isLoading = false
+                                    errorMessage = "Lỗi kết nối: ${e.localizedMessage ?: "Không thể kết nối tới máy chủ"}"
+                                }
+                            }
+                        }
                     }
                 },
+                enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Text(
-                    text = if (isLoginTab) "Đăng nhập" else "Đăng ký",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            // Hoặc đăng nhập bằng mạng xã hội
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                HorizontalDivider(modifier = Modifier.weight(1f).padding(end = 12.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-                Text(text = "Hoặc tiếp tục với", color = Color.Gray, fontSize = 12.sp)
-                HorizontalDivider(modifier = Modifier.weight(1f).padding(start = 12.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-            }
-
-            // Google Login Button
-            OutlinedButton(
-                onClick = { showGoogleAccountPicker = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFEA4335)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "G",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color.White
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
                     )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Tài khoản Google",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-        }
-    }
-
-    // Google Account Picker Mock Dialog
-    if (showGoogleAccountPicker) {
-        Dialog(onDismissRequest = { showGoogleAccountPicker = false }) {
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
+                } else {
                     Text(
-                        text = "Đăng nhập bằng Google",
-                        fontWeight = FontWeight.Bold,
+                        text = if (isLoginTab) "Đăng nhập" else "Đăng ký",
                         fontSize = 16.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = "Chọn tài khoản để tiếp tục với MinLish",
-                        fontSize = 13.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        mockGoogleAccounts.forEach { (name, mail) ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                    .clickable {
-                                        showGoogleAccountPicker = false
-                                        Toast.makeText(context, "Chào mừng $name!", Toast.LENGTH_SHORT).show()
-                                        onNavigate(Screen.LanguageSelection)
-                                    }
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = name.first().toString().uppercase(),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(text = name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                    Text(text = mail, color = Color.Gray, fontSize = 11.sp)
-                                }
-                            }
-                        }
-                    }
-
-                    TextButton(
-                        onClick = { showGoogleAccountPicker = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Hủy", fontWeight = FontWeight.Bold)
-                    }
                 }
             }
+
         }
     }
+
+
 }

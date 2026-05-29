@@ -22,9 +22,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.minlishapp.ui.theme.*
-import com.example.minlishapp.data.*
+import com.example.minlishapp.data.DashboardData
+import com.example.minlishapp.data.ProfileStats
+import com.example.minlishapp.data.DonutChartData
+import com.example.minlishapp.data.BarChartData
 import com.example.minlishapp.data.repository.StatsRepository
+import com.example.minlishapp.ui.screens.Screen
+import com.example.minlishapp.ui.screens.AppBottomBar
+import com.example.minlishapp.ui.theme.ColorStreakFlame
+import com.example.minlishapp.ui.theme.ColorEasy
+import com.example.minlishapp.ui.theme.ColorGood
+import com.example.minlishapp.ui.theme.ColorAgain
+import com.example.minlishapp.ui.theme.MinLishAppTheme
 import kotlinx.coroutines.launch
 
 // Interface definition for UI states
@@ -35,19 +44,19 @@ sealed interface StatsUiState {
 }
 
 @Composable
-fun StatsScreen(onNavigate: (Screen) -> Unit) {
+fun StatsScreen(userId: String, onNavigate: (Screen) -> Unit) {
     val statsRepository = remember { StatsRepository.create() }
     var uiState by remember { mutableStateOf<StatsUiState>(StatsUiState.Loading) }
     val coroutineScope = rememberCoroutineScope()
 
-    // Mock Bearer JWT Token for authMiddleware validation
-    val mockToken = "Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6IjZmMjM0ZTI4LWFmNTgtNGU4OS1iZWYxLWNmZjRjMGQxZDNhNSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2F5dHdndXNodWFteXlzcmpiZ2pyLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJiNjQzNjFjYS03MTlkLTRhMDctYjUwZi05MTBkOGUwNWY5ZGEiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzgwMDI2MTg1LCJpYXQiOjE3ODAwMjI1ODUsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJzdWIiOiJiNjQzNjFjYS03MTlkLTRhMDctYjUwZi05MTBkOGUwNWY5ZGEifSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc4MDAyMjU4NX1dLCJzZXNzaW9uX2lkIjoiNzNlM2Y2MWYtMGE3Mi00ZjZmLTg1MzAtODFiM2I2NTljYTExIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.Kmpnm29MjT-fAt51GXPiPzJMbChvRnJ4GdsZT9P852ToAKVRZrFK2_-F_V4Rc--ax5w4SB5Zaq_Py8hF5DT53A"
+    // Use passed userId, fallback to default test user ID if empty
+    val activeUserId = if (userId.isBlank()) "b64361ca-719d-4a07-b50f-910d8e05f9da" else userId
 
     fun fetchStats() {
         coroutineScope.launch {
             uiState = StatsUiState.Loading
             try {
-                val response = statsRepository.getStatsDashboard(mockToken)
+                val response = statsRepository.getStatsDashboard(activeUserId)
                 if (response.success && response.data != null) {
                     uiState = StatsUiState.Success(response.data)
                 } else {
@@ -213,7 +222,7 @@ fun StatsScreenContent(
                                         val top = size.height - barHeight
 
                                         // Chỉ vẽ khi cột có chiều cao
-                                        if (barHeight > 0) {
+                                        if (barHeight > 0f) {
                                             drawRoundRect(
                                                 color = barColor,
                                                 topLeft = Offset(left, top),
@@ -285,7 +294,7 @@ fun StatsScreenContent(
                                         val stroke = Stroke(width = 16.dp.toPx())
                                         var startAngle = -90f
 
-                                        if (sweepEasy > 0) {
+                                        if (sweepEasy > 0f) {
                                             drawArc(
                                                 color = ColorEasy, // Xanh lá
                                                 startAngle = startAngle,
@@ -295,7 +304,7 @@ fun StatsScreenContent(
                                             )
                                             startAngle += sweepEasy
                                         }
-                                        if (sweepGood > 0) {
+                                        if (sweepGood > 0f) {
                                             drawArc(
                                                 color = ColorGood, // Xanh dương
                                                 startAngle = startAngle,
@@ -305,7 +314,7 @@ fun StatsScreenContent(
                                             )
                                             startAngle += sweepGood
                                         }
-                                        if (sweepAgain > 0) {
+                                        if (sweepAgain > 0f) {
                                             drawArc(
                                                 color = ColorAgain, // Đỏ
                                                 startAngle = startAngle,

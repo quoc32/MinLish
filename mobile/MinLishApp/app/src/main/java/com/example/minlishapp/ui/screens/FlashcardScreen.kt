@@ -1,5 +1,6 @@
 package com.example.minlishapp.ui.screens
 
+import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
@@ -41,6 +42,28 @@ fun FlashcardScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
+
+    // Initialize TextToSpeech engine
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    DisposableEffect(context) {
+        val ttsInstance = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                // Ready
+            }
+        }
+        tts = ttsInstance
+        onDispose {
+            ttsInstance.stop()
+            ttsInstance.shutdown()
+        }
+    }
+
+    fun speak(text: String, isUk: Boolean = false) {
+        tts?.let {
+            it.language = if (isUk) java.util.Locale.UK else java.util.Locale.US
+            it.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+        }
+    }
 
     // 1. Tải danh sách từ học từ activeDeck hoặc fallback
     val studyWords = remember(activeDeck) {
@@ -256,7 +279,7 @@ fun FlashcardScreen(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .clickable {
-                                                    Toast.makeText(context, "🔊 UK: ${currentWord.pronunciation}", Toast.LENGTH_SHORT).show()
+                                                    speak(currentWord.word, isUk = true)
                                                 }
                                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                                         ) {
@@ -281,8 +304,7 @@ fun FlashcardScreen(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .clickable {
-                                                    val usPron = currentWord.pronunciationUs.ifEmpty { currentWord.pronunciation }
-                                                    Toast.makeText(context, "🔊 US: $usPron", Toast.LENGTH_SHORT).show()
+                                                    speak(currentWord.word, isUk = false)
                                                 }
                                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                                         ) {
@@ -658,6 +680,20 @@ fun FlashcardScreen(
                                                 contentDescription = "Hint",
                                                 tint = if (showTypingHint) Color(0xFFEAB308) else Color.Gray
                                             )
+                                        }
+
+                                        // Nút Bỏ qua
+                                        OutlinedButton(
+                                            onClick = {
+                                                isTypingChecked = true
+                                                isTypingCorrect = false
+                                                typingInput = ""
+                                                focusManager.clearFocus()
+                                            },
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.height(48.dp)
+                                        ) {
+                                            Text("Bỏ qua", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                                         }
 
                                         // Nút kiểm tra

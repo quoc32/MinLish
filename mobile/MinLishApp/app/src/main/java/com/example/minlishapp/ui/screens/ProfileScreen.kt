@@ -361,6 +361,49 @@ fun ProfileScreen(
                 }
             }
 
+            // Logout Button
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.08f)),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp)
+                    .clickable {
+                        onProgressUpdate(UserProgress())
+                        Toast.makeText(context, "Đăng xuất thành công!", Toast.LENGTH_SHORT).show()
+                        onNavigate(Screen.Welcome)
+                    }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Logout Icon",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Đăng xuất tài khoản",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Logout",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Phiên bản ứng dụng dưới chân trang
@@ -371,6 +414,7 @@ fun ProfileScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+            Spacer(modifier = Modifier.height(24.dp))
         }
 
         // Time Picker Dialog Mock

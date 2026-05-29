@@ -49,8 +49,32 @@ class MainActivity : ComponentActivity() {
                 Crossfade(targetState = currentScreen, label = "ScreenTransition") { targetScreen ->
                     when (targetScreen) {
                         Screen.Splash -> SplashScreen(onNavigate = { currentScreen = it })
-                        Screen.Welcome -> WelcomeScreen(onNavigate = { currentScreen = it })
-                        Screen.Login -> LoginScreen(onNavigate = { currentScreen = it })
+                        Screen.Welcome -> WelcomeScreen(
+                            onLoginSuccess = { userId, displayName, targetGoal, xp, level, streak ->
+                                userProgress = userProgress.copy(
+                                    userId = userId,
+                                    name = displayName,
+                                    targetGoal = targetGoal,
+                                    xp = xp,
+                                    level = level,
+                                    streak = streak
+                                )
+                            },
+                            onNavigate = { currentScreen = it }
+                        )
+                        Screen.Login -> LoginScreen(
+                            onLoginSuccess = { userId, displayName, targetGoal, xp, level, streak ->
+                                userProgress = userProgress.copy(
+                                    userId = userId,
+                                    name = displayName,
+                                    targetGoal = targetGoal,
+                                    xp = xp,
+                                    level = level,
+                                    streak = streak
+                                )
+                            },
+                            onNavigate = { currentScreen = it }
+                        )
                         Screen.LanguageSelection -> LanguageSelectionScreen(onNavigate = { currentScreen = it })
                         Screen.OnboardingGoals -> OnboardingGoalsScreen(
                             userProgress = userProgress,
@@ -91,7 +115,7 @@ class MainActivity : ComponentActivity() {
                             onNavigate = { currentScreen = it }
                         )
                         Screen.LessonComplete -> LessonCompleteScreen(onNavigate = { currentScreen = it })
-                        Screen.Stats -> StatsScreen(onNavigate = { currentScreen = it })
+                        Screen.Stats -> StatsScreen(userId = userProgress.userId, onNavigate = { currentScreen = it })
                         Screen.Profile -> ProfileScreen(
                             userProgress = userProgress,
                             onProgressUpdate = { userProgress = it },

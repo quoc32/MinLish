@@ -10,7 +10,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,7 +56,18 @@ fun RedWhiteEmailIcon(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun WelcomeScreen(onNavigate: (Screen) -> Unit) {
+fun WelcomeScreen(
+    onLoginSuccess: (userId: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
+    onNavigate: (Screen) -> Unit
+) {
+    val context = LocalContext.current
+    var showGoogleAccountPicker by remember { mutableStateOf(false) }
+    val mockGoogleAccounts = listOf(
+        Pair("Nguyen Van A", "nva@gmail.com"),
+        Pair("Tran Thi B", "ttb@gmail.com"),
+        Pair("MinLish Student", "student@minlish.edu.vn")
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -155,7 +171,7 @@ fun WelcomeScreen(onNavigate: (Screen) -> Unit) {
                     RedWhiteEmailIcon()
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Đăng ký bằng Email",
+                        text = "Đăng nhập bằng Email",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -163,7 +179,7 @@ fun WelcomeScreen(onNavigate: (Screen) -> Unit) {
                 }
 
                 Button(
-                    onClick = { onNavigate(Screen.Login) },
+                    onClick = { showGoogleAccountPicker = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -189,22 +205,98 @@ fun WelcomeScreen(onNavigate: (Screen) -> Unit) {
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Tiếp tục với Google",
+                        text = "Đăng nhập với Google",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                 }
+            }
+        }
 
-                TextButton(
-                    onClick = { onNavigate(Screen.LanguageSelection) }
+        // Google Account Picker Mock Dialog
+        if (showGoogleAccountPicker) {
+            Dialog(onDismissRequest = { showGoogleAccountPicker = false }) {
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
                 ) {
-                    Text(
-                        text = "Trải nghiệm với tư cách Khách",
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Đăng nhập bằng Google",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            text = "Chọn tài khoản để tiếp tục với MinLish",
+                            fontSize = 13.sp,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            mockGoogleAccounts.forEach { (name, mail) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                        .clickable {
+                                            showGoogleAccountPicker = false
+                                            onLoginSuccess(
+                                                "b64361ca-719d-4a07-b50f-910d8e05f9da",
+                                                name,
+                                                "IELTS 7.5",
+                                                380,
+                                                4,
+                                                5
+                                            )
+                                            Toast.makeText(context, "Chào mừng $name!", Toast.LENGTH_SHORT).show()
+                                            onNavigate(Screen.LanguageSelection)
+                                        }
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = name.first().toString().uppercase(),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(text = name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text(text = mail, color = Color.Gray, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+
+                        TextButton(
+                            onClick = { showGoogleAccountPicker = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Hủy", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }

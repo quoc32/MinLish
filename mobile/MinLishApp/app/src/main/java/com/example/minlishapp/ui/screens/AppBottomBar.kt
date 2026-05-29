@@ -20,8 +20,7 @@ fun AppBottomBar(
 ) {
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp,
-        modifier = Modifier.height(80.dp)
+        tonalElevation = 8.dp
     ) {
         val items = listOf(
             Triple(Screen.Dashboard, Icons.Default.Home, "Lộ trình"),
