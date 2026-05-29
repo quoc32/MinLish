@@ -26,20 +26,27 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.minlishapp.data.repository.AuthRepository
 import com.example.minlishapp.data.LoginRequest
 import com.example.minlishapp.data.LoginResponse
 import com.example.minlishapp.data.RegisterRequest
+import com.example.minlishapp.data.GoogleLoginRequest
+import com.example.minlishapp.data.TokenManager
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (userId: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
+    onLoginSuccess: (userId: String, email: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
     onNavigate: (Screen) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val authRepository = remember { AuthRepository.create() }
+    val authRepository = remember { AuthRepository.create(context) }
     var isLoading by remember { mutableStateOf(false) }
     var isLoginTab by remember { mutableStateOf(true) }
     
@@ -54,6 +61,62 @@ fun LoginScreen(
     
     // Validation Error Message
     var errorMessage by remember { mutableStateOf("") }
+
+    val gso = remember {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken("322809065976-21g2210m0rc213m2brjabr0vol0ar8jj.apps.googleusercontent.com")
+            .requestEmail()
+            .build()
+    }
+    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
+
+    val googleAuthLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val idToken = account?.idToken
+            if (idToken != null) {
+                isLoading = true
+                coroutineScope.launch {
+                    try {
+                        val response = authRepository.loginWithGoogle(GoogleLoginRequest(idToken))
+                        isLoading = false
+                        if (response.isSuccessful) {
+                            val body = response.body()
+                            if (body != null && body.success && body.data != null) {
+                                val profile = body.data.profile
+                                val userId = body.data.user.id
+                                val userEmail = body.data.user.email
+                                body.data.session?.accessToken?.let { TokenManager.getInstance(context).saveToken(it) }
+                                
+                                onLoginSuccess(
+                                    userId,
+                                    userEmail,
+                                    profile?.displayName ?: "Học viên",
+                                    profile?.targetGoal ?: "IELTS",
+                                    profile?.xp ?: 0,
+                                    profile?.level ?: 1,
+                                    profile?.streak ?: 0
+                                )
+                                Toast.makeText(context, "Đăng nhập Google thành công!", Toast.LENGTH_SHORT).show()
+                                onNavigate(Screen.Dashboard)
+                            } else {
+                                errorMessage = body?.message ?: "Đăng nhập Google thất bại!"
+                            }
+                        } else {
+                            errorMessage = "Đăng nhập Google thất bại (Mã lỗi: ${response.code()})"
+                        }
+                    } catch (e: Exception) {
+                        isLoading = false
+                        errorMessage = "Lỗi kết nối: ${e.localizedMessage}"
+                    }
+                }
+            }
+        } catch (e: ApiException) {
+            isLoading = false
+            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại."
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -272,8 +335,11 @@ fun LoginScreen(
                                         if (body != null && body.success && body.data != null) {
                                             val profile = body.data.profile
                                             val userId = body.data.user.id
+                                            val userEmail = body.data.user.email
+                                            body.data.session?.accessToken?.let { TokenManager.getInstance(context).saveToken(it) }
                                             onLoginSuccess(
                                                 userId,
+                                                userEmail,
                                                 profile?.displayName ?: "Học viên",
                                                 profile?.targetGoal ?: "IELTS",
                                                 profile?.xp ?: 0,
@@ -281,7 +347,7 @@ fun LoginScreen(
                                                 profile?.streak ?: 0
                                             )
                                             Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
-                                            onNavigate(Screen.LanguageSelection)
+                                            onNavigate(Screen.Dashboard)
                                         } else {
                                             errorMessage = body?.message ?: "Đăng nhập thất bại!"
                                         }
@@ -313,8 +379,11 @@ fun LoginScreen(
                                         if (body != null && body.success && body.data != null) {
                                             val profile = body.data.profile
                                             val userId = body.data.user.id
+                                            val userEmail = body.data.user.email
+                                            body.data.session?.accessToken?.let { TokenManager.getInstance(context).saveToken(it) }
                                             onLoginSuccess(
                                                 userId,
+                                                userEmail,
                                                 profile?.displayName ?: displayName,
                                                 profile?.targetGoal ?: "IELTS",
                                                 profile?.xp ?: 0,
@@ -322,7 +391,7 @@ fun LoginScreen(
                                                 profile?.streak ?: 0
                                             )
                                             Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
-                                            onNavigate(Screen.LanguageSelection)
+                                            onNavigate(Screen.Dashboard)
                                         } else {
                                             errorMessage = body?.message ?: "Đăng ký thất bại!"
                                         }
@@ -361,6 +430,36 @@ fun LoginScreen(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
+            }
+
+            // Google Login Button
+            if (isLoginTab) {
+                OutlinedButton(
+                    onClick = {
+                        isLoading = true
+                        googleSignInClient.signOut().addOnCompleteListener {
+                            googleAuthLauncher.launch(googleSignInClient.signInIntent)
+                        }
+                    },
+                    enabled = !isLoading,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(text = "🌐", fontSize = 18.sp, modifier = Modifier.padding(end = 8.dp))
+                        Text(
+                            text = "Đăng nhập với Google",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
                 }
             }
 

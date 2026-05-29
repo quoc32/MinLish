@@ -44,7 +44,8 @@ data class UserProgress(
     var level: Int = 12,
     var accuracy: Int = 95,
     var learnedLanguage: String = "English",
-    var appLanguage: String = "English"
+    var appLanguage: String = "English",
+    var email: String = ""
 )
 
 data class ProfileStats(
@@ -54,7 +55,8 @@ data class ProfileStats(
     @com.google.gson.annotations.SerializedName("max_streak") val maxStreak: Int,
     @com.google.gson.annotations.SerializedName("target_goal") val targetGoal: String,
     @com.google.gson.annotations.SerializedName("retention_rate") val retentionRate: Double,
-    @com.google.gson.annotations.SerializedName("display_name") val displayName: String? = null
+    @com.google.gson.annotations.SerializedName("display_name") val displayName: String? = null,
+    val email: String? = null
 )
 
 data class DonutChartData(
@@ -92,9 +94,14 @@ data class UserData(
     val email: String
 )
 
+data class SessionData(
+    @com.google.gson.annotations.SerializedName("access_token") val accessToken: String
+)
+
 data class LoginDataResponse(
     val user: UserData,
-    val profile: ProfileStats?
+    val profile: ProfileStats?,
+    val session: SessionData? = null
 )
 
 data class LoginResponse(
@@ -108,5 +115,20 @@ data class RegisterRequest(
     val password: String,
     val displayName: String,
     val targetGoal: String
+)
+
+data class GoogleLoginRequest(
+    val idToken: String
+)
+
+data class ProfileResponse(
+    val success: Boolean,
+    val data: ProfileStats?,
+    val message: String?
+)
+
+data class ProfileUpdateRequest(
+    val displayName: String? = null,
+    val targetGoal: String? = null
 )
 

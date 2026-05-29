@@ -50,9 +50,10 @@ class MainActivity : ComponentActivity() {
                     when (targetScreen) {
                         Screen.Splash -> SplashScreen(onNavigate = { currentScreen = it })
                         Screen.Welcome -> WelcomeScreen(
-                            onLoginSuccess = { userId, displayName, targetGoal, xp, level, streak ->
+                            onLoginSuccess = { userId, email, displayName, targetGoal, xp, level, streak ->
                                 userProgress = userProgress.copy(
                                     userId = userId,
+                                    email = email,
                                     name = displayName,
                                     targetGoal = targetGoal,
                                     xp = xp,
@@ -63,9 +64,10 @@ class MainActivity : ComponentActivity() {
                             onNavigate = { currentScreen = it }
                         )
                         Screen.Login -> LoginScreen(
-                            onLoginSuccess = { userId, displayName, targetGoal, xp, level, streak ->
+                            onLoginSuccess = { userId, email, displayName, targetGoal, xp, level, streak ->
                                 userProgress = userProgress.copy(
                                     userId = userId,
+                                    email = email,
                                     name = displayName,
                                     targetGoal = targetGoal,
                                     xp = xp,

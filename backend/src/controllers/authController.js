@@ -129,6 +129,85 @@ async function login(req, res) {
 }
 
 /**
+ * Login with Google ID Token
+ * POST /api/auth/google
+ */
+async function loginWithGoogle(req, res) {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google ID Token is required.'
+      });
+    }
+
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: idToken
+    });
+
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    const userId = data.user.id;
+    const email = data.user.email || '';
+    const fallbackName = email.includes('@') ? email.split('@')[0] : 'User';
+    const displayName = data.user.user_metadata?.full_name || fallbackName;
+
+    // Fetch matching profile
+    let { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (!profile) {
+      // Create profile if doesn't exist (First time Google Login)
+      const { data: newProfile, error: profileError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            display_name: displayName,
+            target_goal: 'IELTS',
+            level: 1,
+            xp: 0,
+            streak: 0,
+            max_streak: 0,
+            retention_rate: 0
+          }
+        ])
+        .select()
+        .single();
+      
+      profile = newProfile;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged in with Google successfully.',
+      data: {
+        user: data.user,
+        session: data.session, // Contains JWT access_token
+        profile: profile || null
+      }
+    });
+  } catch (err) {
+    console.error('Google Login API error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during Google login.'
+    });
+  }
+}
+
+/**
  * Get profile details
  * GET /api/auth/profile
  */
@@ -152,7 +231,10 @@ async function getProfile(req, res) {
 
     res.status(200).json({
       success: true,
-      data: profile
+      data: {
+        ...profile,
+        email: req.user.email
+      }
     });
   } catch (err) {
     console.error('Get profile API error:', err);
@@ -215,6 +297,7 @@ async function updateProfile(req, res) {
 module.exports = {
   register,
   login,
+  loginWithGoogle,
   getProfile,
   updateProfile
 };

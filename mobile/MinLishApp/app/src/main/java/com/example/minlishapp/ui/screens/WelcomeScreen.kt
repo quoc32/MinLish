@@ -26,7 +26,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.minlishapp.R
+import com.example.minlishapp.data.GoogleLoginRequest
+import com.example.minlishapp.data.TokenManager
+import com.example.minlishapp.data.repository.AuthRepository
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import kotlinx.coroutines.launch
 
 @Composable
 fun RedWhiteEmailIcon(modifier: Modifier = Modifier) {
@@ -57,16 +66,70 @@ fun RedWhiteEmailIcon(modifier: Modifier = Modifier) {
 
 @Composable
 fun WelcomeScreen(
-    onLoginSuccess: (userId: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
+    onLoginSuccess: (userId: String, email: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
     onNavigate: (Screen) -> Unit
 ) {
     val context = LocalContext.current
-    var showGoogleAccountPicker by remember { mutableStateOf(false) }
-    val mockGoogleAccounts = listOf(
-        Pair("Nguyen Van A", "nva@gmail.com"),
-        Pair("Tran Thi B", "ttb@gmail.com"),
-        Pair("MinLish Student", "student@minlish.edu.vn")
-    )
+    val coroutineScope = rememberCoroutineScope()
+    val authRepository = remember { AuthRepository.create(context) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    val gso = remember {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken("322809065976-21g2210m0rc213m2brjabr0vol0ar8jj.apps.googleusercontent.com")
+            .requestEmail()
+            .build()
+    }
+    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
+
+    val googleAuthLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val idToken = account?.idToken
+            if (idToken != null) {
+                isLoading = true
+                coroutineScope.launch {
+                    try {
+                        val response = authRepository.loginWithGoogle(GoogleLoginRequest(idToken))
+                        isLoading = false
+                        if (response.isSuccessful) {
+                            val body = response.body()
+                            if (body != null && body.success && body.data != null) {
+                                val profile = body.data.profile
+                                val userId = body.data.user.id
+                                val userEmail = body.data.user.email
+                                body.data.session?.accessToken?.let { TokenManager.getInstance(context).saveToken(it) }
+                                
+                                onLoginSuccess(
+                                    userId,
+                                    userEmail,
+                                    profile?.displayName ?: "Học viên",
+                                    profile?.targetGoal ?: "IELTS",
+                                    profile?.xp ?: 0,
+                                    profile?.level ?: 1,
+                                    profile?.streak ?: 0
+                                )
+                                Toast.makeText(context, "Đăng nhập Google thành công!", Toast.LENGTH_SHORT).show()
+                                onNavigate(Screen.Dashboard)
+                            } else {
+                                errorMessage = body?.message ?: "Đăng nhập Google thất bại!"
+                            }
+                        } else {
+                            errorMessage = "Đăng nhập Google thất bại (Mã lỗi: ${response.code()})"
+                        }
+                    } catch (e: Exception) {
+                        isLoading = false
+                        errorMessage = "Lỗi kết nối: ${e.localizedMessage}"
+                    }
+                }
+            }
+        } catch (e: ApiException) {
+            isLoading = false
+            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại."
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -179,7 +242,13 @@ fun WelcomeScreen(
                 }
 
                 Button(
-                    onClick = { showGoogleAccountPicker = true },
+                    onClick = {
+                        isLoading = true
+                        googleSignInClient.signOut().addOnCompleteListener {
+                            googleAuthLauncher.launch(googleSignInClient.signInIntent)
+                        }
+                    },
+                    enabled = !isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -214,91 +283,11 @@ fun WelcomeScreen(
             }
         }
 
-        // Google Account Picker Mock Dialog
-        if (showGoogleAccountPicker) {
-            Dialog(onDismissRequest = { showGoogleAccountPicker = false }) {
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    modifier = Modifier.fillMaxWidth().padding(16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Đăng nhập bằng Google",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            text = "Chọn tài khoản để tiếp tục với MinLish",
-                            fontSize = 13.sp,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+            // Xóa mock dialog Google Account Picker vì đã dùng thực tế
 
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            mockGoogleAccounts.forEach { (name, mail) ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                        .clickable {
-                                            showGoogleAccountPicker = false
-                                            onLoginSuccess(
-                                                "b64361ca-719d-4a07-b50f-910d8e05f9da",
-                                                name,
-                                                "IELTS 7.5",
-                                                380,
-                                                4,
-                                                5
-                                            )
-                                            Toast.makeText(context, "Chào mừng $name!", Toast.LENGTH_SHORT).show()
-                                            onNavigate(Screen.LanguageSelection)
-                                        }
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = name.first().toString().uppercase(),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(text = name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                        Text(text = mail, color = Color.Gray, fontSize = 11.sp)
-                                    }
-                                }
-                            }
-                        }
-
-                        TextButton(
-                            onClick = { showGoogleAccountPicker = false },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Hủy", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
+            if (errorMessage.isNotEmpty()) {
+                Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
+                errorMessage = ""
             }
-        }
     }
 }
