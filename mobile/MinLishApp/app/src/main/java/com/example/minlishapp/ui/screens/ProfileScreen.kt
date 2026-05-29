@@ -1,6 +1,9 @@
 package com.example.minlishapp.ui.screens
 
+import android.app.TimePickerDialog
+import android.content.Context
 import android.widget.Toast
+import com.example.minlishapp.data.ReminderManager
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -39,6 +42,7 @@ fun ProfileScreen(
     var isEditingName by remember { mutableStateOf(false) }
     var nameInput by remember { mutableStateOf(userProgress.name) }
     val context = LocalContext.current
+    val sharedPrefs = remember { context.getSharedPreferences("minlish_prefs", Context.MODE_PRIVATE) }
     val coroutineScope = rememberCoroutineScope()
     val authRepository = remember { AuthRepository.create(context) }
     var isLoading by remember { mutableStateOf(false) }
@@ -66,9 +70,9 @@ fun ProfileScreen(
         }
     }
 
-    var dailyReminderEnabled by remember { mutableStateOf(true) }
-    var reviewReminderEnabled by remember { mutableStateOf(true) }
-    var dailyReminderTime by remember { mutableStateOf("09:00") }
+    var dailyReminderEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("daily_reminder_enabled", true)) }
+    var reviewReminderEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("review_reminder_enabled", true)) }
+    var dailyReminderTime by remember { mutableStateOf(sharedPrefs.getString("daily_reminder_time", "09:00") ?: "09:00") }
     var showTimePickerDialog by remember { mutableStateOf(false) }
     var showGoalPicker by remember { mutableStateOf(false) }
     
@@ -348,7 +352,17 @@ fun ProfileScreen(
                         }
                         Switch(
                             checked = dailyReminderEnabled,
-                            onCheckedChange = { dailyReminderEnabled = it }
+                            onCheckedChange = { isEnabled ->
+                                dailyReminderEnabled = isEnabled
+                                sharedPrefs.edit().putBoolean("daily_reminder_enabled", isEnabled).apply()
+                                if (isEnabled) {
+                                    ReminderManager.scheduleDailyReminder(context, dailyReminderTime)
+                                    Toast.makeText(context, "Đã bật nhắc nhở lúc $dailyReminderTime hàng ngày!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    ReminderManager.cancelReminder(context)
+                                    Toast.makeText(context, "Đã tắt nhắc nhở hàng ngày!", Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         )
                     }
 
@@ -410,7 +424,15 @@ fun ProfileScreen(
                         }
                         Switch(
                             checked = reviewReminderEnabled,
-                            onCheckedChange = { reviewReminderEnabled = it }
+                            onCheckedChange = { isEnabled ->
+                                reviewReminderEnabled = isEnabled
+                                sharedPrefs.edit().putBoolean("review_reminder_enabled", isEnabled).apply()
+                                if (isEnabled) {
+                                    Toast.makeText(context, "Đã bật nhắc nhở ôn tập SM-2!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Đã tắt nhắc nhở ôn tập!", Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         )
                     }
                 }
@@ -508,6 +530,7 @@ fun ProfileScreen(
 
                         // Grid of presets
                         val presets = listOf(
+                            "01:30" to "Học đêm khuya 🦉",
                             "07:00" to "Sáng sớm 🌅",
                             "09:00" to "Bắt đầu ngày ☀️",
                             "12:15" to "Nghỉ trưa 🍱",
@@ -530,6 +553,10 @@ fun ProfileScreen(
                                         Card(
                                             onClick = {
                                                 dailyReminderTime = timeStr
+                                                sharedPrefs.edit().putString("daily_reminder_time", timeStr).apply()
+                                                if (dailyReminderEnabled) {
+                                                    ReminderManager.scheduleDailyReminder(context, timeStr)
+                                                }
                                                 Toast.makeText(
                                                     context,
                                                     "Đã hẹn giờ nhắc học lúc $timeStr hàng ngày!",
@@ -566,8 +593,50 @@ fun ProfileScreen(
                                             }
                                         }
                                     }
+                                    if (rowPresets.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
                                 }
                             }
+                        }
+
+                        // Button for Custom Time Picker
+                        Button(
+                            onClick = {
+                                val hour = dailyReminderTime.split(":").getOrNull(0)?.toIntOrNull() ?: 9
+                                val minute = dailyReminderTime.split(":").getOrNull(1)?.toIntOrNull() ?: 0
+                                TimePickerDialog(
+                                    context,
+                                    { _, selectedHour, selectedMinute ->
+                                        val formattedTime = String.format("%02d:%02d", selectedHour, selectedMinute)
+                                        dailyReminderTime = formattedTime
+                                        sharedPrefs.edit().putString("daily_reminder_time", formattedTime).apply()
+                                        if (dailyReminderEnabled) {
+                                            ReminderManager.scheduleDailyReminder(context, formattedTime)
+                                        }
+                                        Toast.makeText(context, "Đã hẹn giờ nhắc học lúc $formattedTime hàng ngày!", Toast.LENGTH_SHORT).show()
+                                        showTimePickerDialog = false
+                                    },
+                                    hour,
+                                    minute,
+                                    true
+                                ).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                contentColor = MaterialTheme.colorScheme.primary
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Tùy chỉnh chọn giờ ⚙️", fontWeight = FontWeight.Bold)
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
