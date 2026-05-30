@@ -110,18 +110,21 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
                     val apiCards = response.body()!!.data
                     if (!apiCards.isNullOrEmpty()) {
                         val words = apiCards.map { card ->
-                            Word(
-                                id = card.id,
-                                word = card.word,
-                                pronunciation = card.pronunciation,
-                                meaning = card.meaning,
-                                description = card.descriptionEn ?: "",
-                                example = card.example ?: "",
-                                wordType = "noun",
-                                easeFactor = card.progress?.easeFactor ?: 2.5,
-                                repetitions = card.progress?.repetitions ?: 0,
-                                intervalDays = card.progress?.interval ?: 0
-                            )
+                                Word(
+                                    id = card.id,
+                                    word = card.word,
+                                    pronunciation = card.pronunciation,
+                                    meaning = card.meaning,
+                                    description = card.descriptionEn ?: "",
+                                    example = card.example ?: "",
+                                    wordType = card.wordType ?: "verb",
+                                    collocations = card.collocation?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList(),
+                                    relatedWords = card.relatedWords?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList(),
+                                    note = card.note ?: "",
+                                    easeFactor = card.progress?.easeFactor ?: 2.5,
+                                    repetitions = card.progress?.repetitions ?: 0,
+                                    intervalDays = card.progress?.interval ?: 0
+                                )
                         }
                         
                         val currentDecks = _decks.value.toMutableList()
@@ -151,7 +154,11 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
                         pronunciation = word.pronunciation,
                         meaning = word.meaning,
                         descriptionEn = word.description,
-                        example = word.example
+                        example = word.example,
+                        wordType = word.wordType,
+                        collocation = word.collocations.joinToString(", "),
+                        relatedWords = word.relatedWords.joinToString(", "),
+                        note = word.note
                     )
                 )
                 if (response.isSuccessful && response.body()?.success == true) {
@@ -179,7 +186,11 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
                         pronunciation = word.pronunciation,
                         meaning = word.meaning,
                         descriptionEn = word.description,
-                        example = word.example
+                        example = word.example,
+                        wordType = word.wordType,
+                        collocation = word.collocations.joinToString(", "),
+                        relatedWords = word.relatedWords.joinToString(", "),
+                        note = word.note
                     )
                 )
                 if (response.isSuccessful && response.body()?.success == true) {

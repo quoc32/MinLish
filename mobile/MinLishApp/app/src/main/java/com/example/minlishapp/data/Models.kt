@@ -186,6 +186,10 @@ data class CardApiItem(
     val meaning: String,
     @com.google.gson.annotations.SerializedName("description_en") val descriptionEn: String? = null,
     val example: String? = null,
+    @com.google.gson.annotations.SerializedName("word_type") val wordType: String? = null,
+    val collocation: String? = null,
+    @com.google.gson.annotations.SerializedName("related_words") val relatedWords: String? = null,
+    val note: String? = null,
     val progress: CardProgress? = null
 )
 
@@ -210,7 +214,11 @@ data class CreateCardRequest(
     val pronunciation: String = "",
     val meaning: String,
     val descriptionEn: String? = null,
-    val example: String? = null
+    val example: String? = null,
+    val wordType: String? = null,
+    val collocation: String? = null,
+    val relatedWords: String? = null,
+    val note: String? = null
 )
 
 data class CreateCardResponse(
@@ -309,7 +317,11 @@ data class CardExportData(
     val pronunciation: String,
     val meaning: String,
     @com.google.gson.annotations.SerializedName("description_en") val descriptionEn: String?,
-    val example: String?
+    val example: String?,
+    @com.google.gson.annotations.SerializedName("word_type") val wordType: String?,
+    val collocation: String?,
+    @com.google.gson.annotations.SerializedName("related_words") val relatedWords: String?,
+    val note: String?
 )
 
 data class ImportDeckResponse(
@@ -321,4 +333,10 @@ data class ImportDeckResponse(
 data class CsvImportRequest(
     val deckName: String,
     val csvData: String
+)
+
+data class ImportMultipleDecksResponse(
+    val success: Boolean,
+    val message: String?,
+    val data: List<DeckApiItem>?
 )

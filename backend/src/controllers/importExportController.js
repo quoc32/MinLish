@@ -117,15 +117,12 @@ async function importDeckCsv(req, res) {
 
     const parsedCards = importExportService.parseCsv(csvData);
 
-    const newDeck = await importExportService.importDeck(userId, {
-      deck: { name: deckName },
-      cards: parsedCards
-    });
+    const newDecks = await importExportService.importMultipleDecks(userId, deckName, parsedCards);
 
     res.status(201).json({
       success: true,
-      message: 'Deck imported from CSV successfully.',
-      data: newDeck
+      message: 'Decks imported from CSV successfully.',
+      data: newDecks
     });
   } catch (err) {
     console.error('Import deck CSV API error:', err);

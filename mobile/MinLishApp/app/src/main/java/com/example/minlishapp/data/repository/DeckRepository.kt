@@ -43,7 +43,7 @@ interface DeckApiService {
     suspend fun exportDeckCsv(@Path("id") deckId: String): Response<okhttp3.ResponseBody>
 
     @POST("api/import-export/import/csv")
-    suspend fun importDeckCsv(@Body request: CsvImportRequest): Response<ImportDeckResponse>
+    suspend fun importDeckCsv(@Body request: CsvImportRequest): Response<ImportMultipleDecksResponse>
 
 
     // === Card endpoints ===
@@ -90,7 +90,7 @@ class DeckRepository(private val apiService: DeckApiService) {
     suspend fun exportDeckCsv(deckId: String): Response<okhttp3.ResponseBody> =
         apiService.exportDeckCsv(deckId)
 
-    suspend fun importDeckCsv(request: CsvImportRequest): Response<ImportDeckResponse> =
+    suspend fun importDeckCsv(request: CsvImportRequest): Response<ImportMultipleDecksResponse> =
         apiService.importDeckCsv(request)
 
 
@@ -118,6 +118,9 @@ class DeckRepository(private val apiService: DeckApiService) {
             val authInterceptor = AuthInterceptor(context)
 
             val client = OkHttpClient.Builder()
+                .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
                 .addInterceptor(logging)
                 .addInterceptor(authInterceptor)
                 .build()

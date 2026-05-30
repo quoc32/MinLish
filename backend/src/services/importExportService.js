@@ -19,7 +19,7 @@ async function exportDeck(deckId, userId) {
 
   const { data: cards, error: cardsError } = await supabase
     .from('cards')
-    .select('word, pronunciation, meaning, description_en, example')
+    .select('word, pronunciation, meaning, description_en, example, word_type, collocation, related_words, note')
     .eq('deck_id', deckId);
 
   if (cardsError) {
@@ -51,14 +51,26 @@ async function importDeck(userId, { deck, cards }) {
 
   // Insert cards
   if (cards && cards.length > 0) {
-    const cardsToInsert = cards.map(c => ({
-      deck_id: newDeck.id,
-      word: c.word ? c.word.trim() : '',
-      pronunciation: c.pronunciation || '',
-      meaning: c.meaning ? c.meaning.trim() : '',
-      description_en: c.description_en || '',
-      example: c.example || ''
-    })).filter(c => c.word && c.meaning);
+    const cardsToInsert = cards.map((c, index) => {
+      const word = c.word ? c.word.trim() : '';
+      const meaning = c.meaning ? c.meaning.trim() : '';
+
+      if (!word) throw new Error(`Row/Item ${index + 1} is missing the required 'word' field.`);
+      if (!meaning) throw new Error(`Row/Item ${index + 1} (word: ${word}) is missing the required 'meaning' field.`);
+
+      return {
+        deck_id: newDeck.id,
+        word,
+        pronunciation: c.pronunciation || '',
+        meaning,
+        description_en: c.description_en || '',
+        example: c.example || '',
+        word_type: c.word_type || '',
+        collocation: c.collocation || '',
+        related_words: c.related_words || '',
+        note: c.note || ''
+      };
+    });
 
     if (cardsToInsert.length > 0) {
       const { error: insertError } = await supabase
@@ -83,6 +95,46 @@ async function importDeck(userId, { deck, cards }) {
 }
 
 /**
+ * Import multiple decks from a list of cards (used for CSV import with deck_name column)
+ */
+async function importMultipleDecks(userId, defaultDeckName, cards) {
+  if (!cards || cards.length === 0) {
+    throw new Error('No cards to import. Please check your file.');
+  }
+
+  // Pre-validate all cards before processing
+  cards.forEach((c, index) => {
+    if (!c.word || !c.word.trim()) {
+      throw new Error(`Row ${index + 1} is missing the required 'word' field.`);
+    }
+    if (!c.meaning || !c.meaning.trim()) {
+      throw new Error(`Row ${index + 1} (word: ${c.word}) is missing the required 'meaning' field.`);
+    }
+  });
+
+  // Group cards by deck_name
+  const groupedCards = {};
+  cards.forEach(card => {
+    const dName = (card.deck_name || defaultDeckName || 'Imported Deck').trim();
+    if (!groupedCards[dName]) {
+      groupedCards[dName] = { 
+        cards: [], 
+        tag: card.deck_tag || card.tag || null 
+      };
+    }
+    groupedCards[dName].cards.push(card);
+  });
+
+  const createdDecks = [];
+  for (const [dName, data] of Object.entries(groupedCards)) {
+    const newDeck = await importDeck(userId, { deck: { name: dName, tag: data.tag }, cards: data.cards });
+    createdDecks.push(newDeck);
+  }
+
+  return createdDecks;
+}
+
+/**
  * Escape a field value for CSV output.
  * Wraps in double quotes if the value contains commas, quotes, or newlines.
  */
@@ -96,19 +148,25 @@ function escapeCsvField(value) {
 
 /**
  * Export a deck as a CSV string.
- * Columns: word, pronunciation, meaning, description_en, example
+ * Columns: word, pronunciation, meaning, description_en, example, word_type, collocation, related_words, note, deck_name, deck_tag
  */
 async function exportDeckCsv(deckId, userId) {
   const { deck, cards } = await exportDeck(deckId, userId);
 
-  const header = 'word,pronunciation,meaning,description_en,example';
+  const header = 'word,pronunciation,meaning,description_en,example,word_type,collocation,related_words,note,deck_name,deck_tag';
   const rows = cards.map(c => {
     return [
       escapeCsvField(c.word),
       escapeCsvField(c.pronunciation),
       escapeCsvField(c.meaning),
       escapeCsvField(c.description_en),
-      escapeCsvField(c.example)
+      escapeCsvField(c.example),
+      escapeCsvField(c.word_type),
+      escapeCsvField(c.collocation),
+      escapeCsvField(c.related_words),
+      escapeCsvField(c.note),
+      escapeCsvField(deck.name),
+      escapeCsvField(deck.tag)
     ].join(',');
   });
 
@@ -164,7 +222,7 @@ function parseCSVLine(line) {
  * Handles quoted fields containing commas and escaped double quotes.
  */
 function parseCsv(csvData) {
-  const columns = ['word', 'pronunciation', 'meaning', 'description_en', 'example'];
+  const columns = ['word', 'pronunciation', 'meaning', 'description_en', 'example', 'word_type', 'collocation', 'related_words', 'note', 'deck_name', 'deck_tag'];
   const results = [];
 
   // Split into lines, handling both \r\n and \n, but respecting quoted fields
@@ -219,6 +277,7 @@ function parseCsv(csvData) {
 module.exports = {
   exportDeck,
   importDeck,
+  importMultipleDecks,
   exportDeckCsv,
   parseCsv
 };

@@ -99,6 +99,7 @@ async function createDeck(req, res) {
 async function updateDeck(req, res) {
   try {
     const deckId = req.params.id;
+    const userId = req.user.id;
     const { name, icon, tag } = req.body;
 
     if (!deckId) {
@@ -108,7 +109,7 @@ async function updateDeck(req, res) {
       });
     }
 
-    const updatedDeck = await deckService.updateDeck(deckId, { name, icon, tag });
+    const updatedDeck = await deckService.updateDeck(deckId, userId, { name, icon, tag });
 
     res.status(200).json({
       success: true,
@@ -131,6 +132,7 @@ async function updateDeck(req, res) {
 async function deleteDeck(req, res) {
   try {
     const deckId = req.params.id;
+    const userId = req.user.id;
 
     if (!deckId) {
       return res.status(400).json({
@@ -139,7 +141,7 @@ async function deleteDeck(req, res) {
       });
     }
 
-    await deckService.deleteDeck(deckId);
+    await deckService.deleteDeck(deckId, userId);
 
     res.status(200).json({
       success: true,

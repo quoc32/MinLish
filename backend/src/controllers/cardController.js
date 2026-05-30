@@ -6,7 +6,8 @@ const cardService = require('../services/cardService');
  */
 async function createCard(req, res) {
   try {
-    const { deckId, word, pronunciation, meaning, descriptionEn, example } = req.body;
+    const userId = req.user.id;
+    const { deckId, word, pronunciation, meaning, descriptionEn, example, wordType, collocation, relatedWords, note } = req.body;
 
     if (!deckId || !word || !meaning) {
       return res.status(400).json({
@@ -15,7 +16,7 @@ async function createCard(req, res) {
       });
     }
 
-    const newCard = await cardService.createCard({ deckId, word, pronunciation, meaning, descriptionEn, example });
+    const newCard = await cardService.createCard(userId, { deckId, word, pronunciation, meaning, descriptionEn, example, wordType, collocation, relatedWords, note });
 
     res.status(201).json({
       success: true,
@@ -41,7 +42,8 @@ async function createCard(req, res) {
 async function updateCard(req, res) {
   try {
     const cardId = req.params.id;
-    const { word, pronunciation, meaning, descriptionEn, example } = req.body;
+    const userId = req.user.id;
+    const { word, pronunciation, meaning, descriptionEn, example, wordType, collocation, relatedWords, note } = req.body;
 
     if (!cardId) {
       return res.status(400).json({
@@ -50,7 +52,7 @@ async function updateCard(req, res) {
       });
     }
 
-    const updatedCard = await cardService.updateCard(cardId, { word, pronunciation, meaning, descriptionEn, example });
+    const updatedCard = await cardService.updateCard(cardId, userId, { word, pronunciation, meaning, descriptionEn, example, wordType, collocation, relatedWords, note });
 
     res.status(200).json({
       success: true,
@@ -73,6 +75,7 @@ async function updateCard(req, res) {
 async function deleteCard(req, res) {
   try {
     const cardId = req.params.id;
+    const userId = req.user.id;
 
     if (!cardId) {
       return res.status(400).json({
@@ -81,7 +84,7 @@ async function deleteCard(req, res) {
       });
     }
 
-    await cardService.deleteCard(cardId);
+    await cardService.deleteCard(cardId, userId);
 
     res.status(200).json({
       success: true,
@@ -105,6 +108,7 @@ async function deleteCard(req, res) {
  */
 async function createBulkCards(req, res) {
   try {
+    const userId = req.user.id;
     const { deckId, cards } = req.body;
 
     if (!deckId || !cards || !Array.isArray(cards)) {
@@ -114,7 +118,7 @@ async function createBulkCards(req, res) {
       });
     }
 
-    const insertedCount = await cardService.createBulkCards(deckId, cards);
+    const insertedCount = await cardService.createBulkCards(deckId, userId, cards);
 
     res.status(201).json({
       success: true,

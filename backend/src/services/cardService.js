@@ -1,15 +1,19 @@
 const { supabase } = require('../config/supabase');
 
-async function createCard({ deckId, word, pronunciation, meaning, descriptionEn, example }) {
-  // 1. Verify deck exists
+async function createCard(userId, { deckId, word, pronunciation, meaning, descriptionEn, example, wordType, collocation, relatedWords, note }) {
+  // 1. Verify deck exists and check ownership
   const { data: deck, error: deckError } = await supabase
     .from('decks')
-    .select('id, total_words')
+    .select('id, total_words, user_id')
     .eq('id', deckId)
     .single();
 
   if (deckError || !deck) {
     throw new Error('Deck not found.');
+  }
+
+  if (deck.user_id !== userId) {
+    throw new Error('Access denied. You can only add cards to your own decks.');
   }
 
   // 2. Insert the new card
@@ -21,7 +25,11 @@ async function createCard({ deckId, word, pronunciation, meaning, descriptionEn,
       pronunciation: pronunciation || '',
       meaning: meaning.trim(),
       description_en: descriptionEn || '',
-      example: example || ''
+      example: example || '',
+      word_type: wordType || '',
+      collocation: collocation || '',
+      related_words: relatedWords || '',
+      note: note || ''
     })
     .select()
     .single();
@@ -39,14 +47,33 @@ async function createCard({ deckId, word, pronunciation, meaning, descriptionEn,
   return newCard;
 }
 
-async function updateCard(cardId, { word, pronunciation, meaning, descriptionEn, example }) {
-  // Build update payload dynamically
+async function updateCard(cardId, userId, { word, pronunciation, meaning, descriptionEn, example, wordType, collocation, relatedWords, note }) {
+  // 1. Verify card ownership via deck
+  const { data: card, error: cardError } = await supabase
+    .from('cards')
+    .select('id, deck_id, decks(user_id)')
+    .eq('id', cardId)
+    .single();
+
+  if (cardError || !card) {
+    throw new Error('Card not found.');
+  }
+
+  if (card.decks && card.decks.user_id !== userId) {
+    throw new Error('Access denied. You do not own the deck this card belongs to.');
+  }
+
+  // 2. Build update payload dynamically
   const updates = {};
   if (word !== undefined) updates.word = word.trim();
   if (pronunciation !== undefined) updates.pronunciation = pronunciation;
   if (meaning !== undefined) updates.meaning = meaning.trim();
   if (descriptionEn !== undefined) updates.description_en = descriptionEn;
   if (example !== undefined) updates.example = example;
+  if (wordType !== undefined) updates.word_type = wordType;
+  if (collocation !== undefined) updates.collocation = collocation;
+  if (relatedWords !== undefined) updates.related_words = relatedWords;
+  if (note !== undefined) updates.note = note;
 
   if (Object.keys(updates).length === 0) {
     throw new Error('At least one field is required to update.');
@@ -66,16 +93,20 @@ async function updateCard(cardId, { word, pronunciation, meaning, descriptionEn,
   return updatedCard;
 }
 
-async function deleteCard(cardId) {
-  // 1. Fetch card to get its deck_id
+async function deleteCard(cardId, userId) {
+  // 1. Fetch card to get its deck_id and verify ownership
   const { data: card, error: cardError } = await supabase
     .from('cards')
-    .select('id, deck_id')
+    .select('id, deck_id, decks(user_id)')
     .eq('id', cardId)
     .single();
 
   if (cardError || !card) {
     throw new Error('Card not found.');
+  }
+
+  if (card.decks && card.decks.user_id !== userId) {
+    throw new Error('Access denied. You do not own the deck this card belongs to.');
   }
 
   // 2. Cascade delete: word_progress for this card
@@ -106,16 +137,20 @@ async function deleteCard(cardId) {
     .eq('id', card.deck_id);
 }
 
-async function createBulkCards(deckId, cardsData) {
-  // 1. Verify deck exists
+async function createBulkCards(deckId, userId, cardsData) {
+  // 1. Verify deck exists and check ownership
   const { data: deck, error: deckError } = await supabase
     .from('decks')
-    .select('id, total_words')
+    .select('id, total_words, user_id')
     .eq('id', deckId)
     .single();
 
   if (deckError || !deck) {
     throw new Error('Deck not found.');
+  }
+
+  if (deck.user_id !== userId) {
+    throw new Error('Access denied. You can only add cards to your own decks.');
   }
 
   // 2. Prepare cards to insert
@@ -125,7 +160,11 @@ async function createBulkCards(deckId, cardsData) {
     pronunciation: c.pronunciation || '',
     meaning: c.meaning ? c.meaning.trim() : '',
     description_en: c.descriptionEn || c.description_en || '',
-    example: c.example || ''
+    example: c.example || '',
+    word_type: c.wordType || c.word_type || '',
+    collocation: c.collocation || '',
+    related_words: c.relatedWords || c.related_words || '',
+    note: c.note || ''
   })).filter(c => c.word && c.meaning);
 
   if (cardsToInsert.length === 0) {

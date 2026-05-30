@@ -88,6 +88,10 @@ async function getDeckCards(deckId, userId) {
       meaning,
       description_en,
       example,
+      word_type,
+      collocation,
+      related_words,
+      note,
       word_progress (
         status,
         ease_factor,
@@ -117,6 +121,10 @@ async function getDeckCards(deckId, userId) {
       meaning: card.meaning,
       description_en: card.description_en,
       example: card.example,
+      word_type: card.word_type,
+      collocation: card.collocation,
+      related_words: card.related_words,
+      note: card.note,
       progress: userWordProgress ? {
         status: userWordProgress.status,
         ease_factor: parseFloat(userWordProgress.ease_factor),
@@ -187,8 +195,23 @@ async function createDeck(userId, { name, icon, tag }) {
   };
 }
 
-async function updateDeck(deckId, { name, icon, tag }) {
-  // Build update payload dynamically
+async function updateDeck(deckId, userId, { name, icon, tag }) {
+  // 1. Verify ownership
+  const { data: deck, error: fetchError } = await supabase
+    .from('decks')
+    .select('user_id')
+    .eq('id', deckId)
+    .single();
+
+  if (fetchError || !deck) {
+    throw new Error('Deck not found.');
+  }
+
+  if (deck.user_id !== userId) {
+    throw new Error('Access denied. You do not own this deck.');
+  }
+
+  // 2. Build update payload dynamically
   const updates = {};
   if (name !== undefined) updates.name = name.trim();
   if (icon !== undefined) updates.icon = icon;
@@ -212,8 +235,23 @@ async function updateDeck(deckId, { name, icon, tag }) {
   return updatedDeck;
 }
 
-async function deleteDeck(deckId) {
-  // 1. Fetch all card IDs in this deck (needed for cascade cleanup)
+async function deleteDeck(deckId, userId) {
+  // 1. Verify ownership
+  const { data: deck, error: fetchError } = await supabase
+    .from('decks')
+    .select('user_id')
+    .eq('id', deckId)
+    .single();
+
+  if (fetchError || !deck) {
+    throw new Error('Deck not found.');
+  }
+
+  if (deck.user_id !== userId) {
+    throw new Error('Access denied. You do not own this deck.');
+  }
+
+  // 2. Fetch all card IDs in this deck (needed for cascade cleanup)
   const { data: deckCards } = await supabase
     .from('cards')
     .select('id')
