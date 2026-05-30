@@ -1,4 +1,4 @@
-package com.example.minlishapp.data
+package com.example.minlishapp.core.network
 
 import android.content.Context
 import android.content.SharedPreferences

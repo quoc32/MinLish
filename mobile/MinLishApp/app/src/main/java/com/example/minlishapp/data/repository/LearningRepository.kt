@@ -8,18 +8,8 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.*
-
-/**
- * Retrofit API interface for Learning endpoints (Daily Plan + Review)
- */
-interface LearningApiService {
-    @GET("api/learning/daily")
-    suspend fun getDailyPlan(): Response<DailyPlanResponse>
-
-    @POST("api/learning/review")
-    suspend fun submitReview(@Body request: ReviewRequest): Response<ReviewResponse>
-}
+import com.example.minlishapp.core.network.AuthInterceptor
+import com.example.minlishapp.data.remote.LearningApiService
 
 /**
  * Repository wrapping LearningApiService for convenient access

@@ -1,4 +1,4 @@
-package com.example.minlishapp.data
+package com.example.minlishapp.core.utils
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

@@ -30,7 +30,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.minlishapp.R
 import com.example.minlishapp.data.GoogleLoginRequest
-import com.example.minlishapp.data.TokenManager
+import com.example.minlishapp.core.network.TokenManager
 import com.example.minlishapp.data.repository.AuthRepository
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions

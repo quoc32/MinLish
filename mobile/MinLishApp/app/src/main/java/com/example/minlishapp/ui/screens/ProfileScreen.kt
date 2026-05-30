@@ -3,7 +3,7 @@ package com.example.minlishapp.ui.screens
 import android.app.TimePickerDialog
 import android.content.Context
 import android.widget.Toast
-import com.example.minlishapp.data.ReminderManager
+import com.example.minlishapp.core.utils.ReminderManager
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.minlishapp.data.UserProgress
 import com.example.minlishapp.data.ProfileUpdateRequest
-import com.example.minlishapp.data.TokenManager
+import com.example.minlishapp.core.network.TokenManager
 import com.example.minlishapp.data.repository.AuthRepository
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch

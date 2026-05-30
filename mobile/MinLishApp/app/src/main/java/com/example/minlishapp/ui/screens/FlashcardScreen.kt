@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.minlishapp.data.Deck
 import com.example.minlishapp.data.Word
-import com.example.minlishapp.data.Sm2Engine
+import com.example.minlishapp.core.utils.Sm2Engine
 import com.example.minlishapp.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

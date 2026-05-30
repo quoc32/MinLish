@@ -34,7 +34,7 @@
 
         <!-- Register Reminder Broadcast Receiver -->
         <receiver
-            android:name=".data.ReminderReceiver"
+            android:name=".core.utils.ReminderReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>

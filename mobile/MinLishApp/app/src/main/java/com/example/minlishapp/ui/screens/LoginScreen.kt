@@ -33,7 +33,7 @@ import com.example.minlishapp.data.LoginRequest
 import com.example.minlishapp.data.LoginResponse
 import com.example.minlishapp.data.RegisterRequest
 import com.example.minlishapp.data.GoogleLoginRequest
-import com.example.minlishapp.data.TokenManager
+import com.example.minlishapp.core.network.TokenManager
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
