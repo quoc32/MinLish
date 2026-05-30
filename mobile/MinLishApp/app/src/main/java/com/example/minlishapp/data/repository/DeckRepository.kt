@@ -33,6 +33,19 @@ interface DeckApiService {
     @DELETE("api/decks/{id}")
     suspend fun deleteDeck(@Path("id") deckId: String): Response<CreateDeckResponse>
 
+    @GET("api/decks/{id}/export")
+    suspend fun exportDeck(@Path("id") deckId: String): Response<DeckExportJson>
+
+    @POST("api/decks/import")
+    suspend fun importDeck(@Body request: DeckExportJson): Response<ImportDeckResponse>
+
+    @GET("api/import-export/export/{id}/csv")
+    suspend fun exportDeckCsv(@Path("id") deckId: String): Response<okhttp3.ResponseBody>
+
+    @POST("api/import-export/import/csv")
+    suspend fun importDeckCsv(@Body request: CsvImportRequest): Response<ImportDeckResponse>
+
+
     // === Card endpoints ===
     @POST("api/cards")
     suspend fun createCard(@Body request: CreateCardRequest): Response<CreateCardResponse>
@@ -67,6 +80,19 @@ class DeckRepository(private val apiService: DeckApiService) {
 
     suspend fun deleteDeck(deckId: String): Response<CreateDeckResponse> =
         apiService.deleteDeck(deckId)
+
+    suspend fun exportDeck(deckId: String): Response<DeckExportJson> =
+        apiService.exportDeck(deckId)
+
+    suspend fun importDeck(request: DeckExportJson): Response<ImportDeckResponse> =
+        apiService.importDeck(request)
+
+    suspend fun exportDeckCsv(deckId: String): Response<okhttp3.ResponseBody> =
+        apiService.exportDeckCsv(deckId)
+
+    suspend fun importDeckCsv(request: CsvImportRequest): Response<ImportDeckResponse> =
+        apiService.importDeckCsv(request)
+
 
     // === Card operations ===
     suspend fun createCard(request: CreateCardRequest): Response<CreateCardResponse> =

@@ -1,4 +1,4 @@
-const { supabase } = require('../config/supabase');
+const cardService = require('../services/cardService');
 
 /**
  * Create a new card in a deck
@@ -15,47 +15,7 @@ async function createCard(req, res) {
       });
     }
 
-    // 1. Verify deck exists
-    const { data: deck, error: deckError } = await supabase
-      .from('decks')
-      .select('id, total_words')
-      .eq('id', deckId)
-      .single();
-
-    if (deckError || !deck) {
-      return res.status(404).json({
-        success: false,
-        message: 'Deck not found.'
-      });
-    }
-
-    // 2. Insert the new card
-    const { data: newCard, error: insertError } = await supabase
-      .from('cards')
-      .insert({
-        deck_id: deckId,
-        word: word.trim(),
-        pronunciation: pronunciation || '',
-        meaning: meaning.trim(),
-        description_en: descriptionEn || '',
-        example: example || ''
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      return res.status(400).json({
-        success: false,
-        message: 'Failed to create card.',
-        error: insertError.message
-      });
-    }
-
-    // 3. Update total_words count in the deck
-    await supabase
-      .from('decks')
-      .update({ total_words: (deck.total_words || 0) + 1 })
-      .eq('id', deckId);
+    const newCard = await cardService.createCard({ deckId, word, pronunciation, meaning, descriptionEn, example });
 
     res.status(201).json({
       success: true,
@@ -64,9 +24,12 @@ async function createCard(req, res) {
     });
   } catch (err) {
     console.error('Create card API error:', err);
-    res.status(500).json({
+    if (err.message === 'Deck not found.') {
+      return res.status(404).json({ success: false, message: err.message });
+    }
+    res.status(err.message.startsWith('Failed') ? 400 : 500).json({
       success: false,
-      message: 'Internal server error creating card.'
+      message: err.message || 'Internal server error creating card.'
     });
   }
 }
@@ -87,35 +50,7 @@ async function updateCard(req, res) {
       });
     }
 
-    // Build update payload dynamically
-    const updates = {};
-    if (word !== undefined) updates.word = word.trim();
-    if (pronunciation !== undefined) updates.pronunciation = pronunciation;
-    if (meaning !== undefined) updates.meaning = meaning.trim();
-    if (descriptionEn !== undefined) updates.description_en = descriptionEn;
-    if (example !== undefined) updates.example = example;
-
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'At least one field is required to update.'
-      });
-    }
-
-    const { data: updatedCard, error } = await supabase
-      .from('cards')
-      .update(updates)
-      .eq('id', cardId)
-      .select()
-      .single();
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'Failed to update card.',
-        error: error.message
-      });
-    }
+    const updatedCard = await cardService.updateCard(cardId, { word, pronunciation, meaning, descriptionEn, example });
 
     res.status(200).json({
       success: true,
@@ -124,9 +59,9 @@ async function updateCard(req, res) {
     });
   } catch (err) {
     console.error('Update card API error:', err);
-    res.status(500).json({
+    res.status(err.message.includes('required') || err.message.startsWith('Failed') ? 400 : 500).json({
       success: false,
-      message: 'Internal server error updating card.'
+      message: err.message || 'Internal server error updating card.'
     });
   }
 }
@@ -146,50 +81,7 @@ async function deleteCard(req, res) {
       });
     }
 
-    // 1. Fetch card to get its deck_id
-    const { data: card, error: cardError } = await supabase
-      .from('cards')
-      .select('id, deck_id')
-      .eq('id', cardId)
-      .single();
-
-    if (cardError || !card) {
-      return res.status(404).json({
-        success: false,
-        message: 'Card not found.'
-      });
-    }
-
-    // 2. Cascade delete: word_progress for this card
-    await supabase
-      .from('word_progress')
-      .delete()
-      .eq('card_id', cardId);
-
-    // 3. Delete the card
-    const { error: deleteError } = await supabase
-      .from('cards')
-      .delete()
-      .eq('id', cardId);
-
-    if (deleteError) {
-      return res.status(400).json({
-        success: false,
-        message: 'Failed to delete card.',
-        error: deleteError.message
-      });
-    }
-
-    // 4. Update total_words count in the deck
-    const { count: remainingCards } = await supabase
-      .from('cards')
-      .select('*', { count: 'exact', head: true })
-      .eq('deck_id', card.deck_id);
-
-    await supabase
-      .from('decks')
-      .update({ total_words: remainingCards || 0 })
-      .eq('id', card.deck_id);
+    await cardService.deleteCard(cardId);
 
     res.status(200).json({
       success: true,
@@ -197,9 +89,45 @@ async function deleteCard(req, res) {
     });
   } catch (err) {
     console.error('Delete card API error:', err);
-    res.status(500).json({
+    if (err.message === 'Card not found.') {
+      return res.status(404).json({ success: false, message: err.message });
+    }
+    res.status(err.message.startsWith('Failed') ? 400 : 500).json({
       success: false,
-      message: 'Internal server error deleting card.'
+      message: err.message || 'Internal server error deleting card.'
+    });
+  }
+}
+
+/**
+ * Create multiple cards in a deck
+ * POST /api/cards/bulk
+ */
+async function createBulkCards(req, res) {
+  try {
+    const { deckId, cards } = req.body;
+
+    if (!deckId || !cards || !Array.isArray(cards)) {
+      return res.status(400).json({
+        success: false,
+        message: 'deckId and an array of cards are required.'
+      });
+    }
+
+    const insertedCount = await cardService.createBulkCards(deckId, cards);
+
+    res.status(201).json({
+      success: true,
+      message: `${insertedCount} cards created successfully.`
+    });
+  } catch (err) {
+    console.error('Create bulk cards API error:', err);
+    if (err.message === 'Deck not found.') {
+      return res.status(404).json({ success: false, message: err.message });
+    }
+    res.status(err.message.startsWith('Failed') || err.message.includes('valid cards') ? 400 : 500).json({
+      success: false,
+      message: err.message || 'Internal server error creating bulk cards.'
     });
   }
 }
@@ -207,5 +135,6 @@ async function deleteCard(req, res) {
 module.exports = {
   createCard,
   updateCard,
-  deleteCard
+  deleteCard,
+  createBulkCards
 };

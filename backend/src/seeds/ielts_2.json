@@ -1,0 +1,22 @@
+{
+  "deck": {
+    "name": "IELTS Academic 2",
+    "icon": "📖",
+    "tag": "Academic",
+    "target_goal": "IELTS"
+  },
+  "cards": [
+    {"word": "Administration", "pronunciation": "/ədˌmɪnɪˈstreɪʃn/", "meaning": "Sự quản lý, hành chính", "example": "He works in hospital administration."},
+    {"word": "Adult", "pronunciation": "/ˈædʌlt/", "meaning": "Người lớn", "example": "The movie is for adults only."},
+    {"word": "Advocate", "pronunciation": "/ˈædvəkət/", "meaning": "Ủng hộ, người ủng hộ", "example": "She is an advocate for animal rights."},
+    {"word": "Affect", "pronunciation": "/əˈfekt/", "meaning": "Ảnh hưởng", "example": "The weather can affect your mood."},
+    {"word": "Aggregate", "pronunciation": "/ˈæɡrɪɡət/", "meaning": "Tổng số, gộp lại", "example": "The aggregate score was high."},
+    {"word": "Aid", "pronunciation": "/eɪd/", "meaning": "Giúp đỡ, viện trợ", "example": "They provided medical aid to the victims."},
+    {"word": "Allocate", "pronunciation": "/ˈæləkeɪt/", "meaning": "Phân bổ", "example": "We allocate funds for research."},
+    {"word": "Alter", "pronunciation": "/ˈɔːltə(r)/", "meaning": "Thay đổi", "example": "We can alter the plans."},
+    {"word": "Alternative", "pronunciation": "/ɔːlˈtɜːnətɪv/", "meaning": "Thay thế, sự lựa chọn", "example": "We need to find an alternative solution."},
+    {"word": "Ambiguous", "pronunciation": "/æmˈbɪɡjuəs/", "meaning": "Mơ hồ", "example": "The instructions were ambiguous."},
+    {"word": "Amend", "pronunciation": "/əˈmend/", "meaning": "Sửa đổi", "example": "They will amend the law."},
+    {"word": "Analogy", "pronunciation": "/əˈnælədʒi/", "meaning": "Sự tương tự", "example": "He drew an analogy between the brain and a computer."}
+  ]
+}

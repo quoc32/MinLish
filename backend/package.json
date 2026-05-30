@@ -5,7 +5,8 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "node src/app.js"
+    "dev": "nodemon src/app.js",
+    "seed": "node src/seeds/runSeed.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.43.4",
@@ -13,5 +14,8 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }

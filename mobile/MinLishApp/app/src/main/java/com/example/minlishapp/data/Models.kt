@@ -285,3 +285,40 @@ data class ReviewResponse(
     val message: String?,
     val data: ReviewData?
 )
+
+// ============================================================
+// Export / Import API Models
+// ============================================================
+
+data class DeckExportJson(
+    val export_date: String,
+    val app_version: String,
+    val format_version: String,
+    val data: DeckExportData
+)
+
+data class DeckExportData(
+    val id: String,
+    val name: String,
+    val tag: String?,
+    val cards: List<CardExportData>
+)
+
+data class CardExportData(
+    val word: String,
+    val pronunciation: String,
+    val meaning: String,
+    @com.google.gson.annotations.SerializedName("description_en") val descriptionEn: String?,
+    val example: String?
+)
+
+data class ImportDeckResponse(
+    val success: Boolean,
+    val message: String?,
+    val data: DeckApiItem?
+)
+
+data class CsvImportRequest(
+    val deckName: String,
+    val csvData: String
+)
