@@ -20,8 +20,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun LanguageSelectionScreen(onNavigate: (Screen) -> Unit) {
-    var selectedLang by remember { mutableStateOf("vi") }
+fun LanguageSelectionScreen(
+    userProgress: com.example.minlishapp.data.UserProgress,
+    onProgressUpdate: (com.example.minlishapp.data.UserProgress) -> Unit,
+    onNavigate: (Screen) -> Unit
+) {
+    var selectedLang by remember { mutableStateOf(if (userProgress.appLanguage == "English") "en" else "vi") }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -169,7 +173,10 @@ fun LanguageSelectionScreen(onNavigate: (Screen) -> Unit) {
             }
 
             Button(
-                onClick = { onNavigate(Screen.OnboardingGoals) },
+                onClick = {
+                    onProgressUpdate(userProgress.copy(appLanguage = if (selectedLang == "en") "English" else "Vietnamese"))
+                    onNavigate(Screen.OnboardingGoals)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (isSmallScreen) 46.dp else 52.dp),

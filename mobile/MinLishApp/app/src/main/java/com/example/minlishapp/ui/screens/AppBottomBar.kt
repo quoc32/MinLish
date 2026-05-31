@@ -12,11 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.minlishapp.core.utils.translated
 
 @Composable
 fun AppBottomBar(
     currentScreen: Screen,
-    onNavigate: (Screen) -> Unit
+    onNavigate: (Screen) -> Unit,
+    appLanguage: String = "Vietnamese"
 ) {
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -37,13 +39,13 @@ fun AppBottomBar(
                 icon = {
                     Icon(
                         imageVector = icon,
-                        contentDescription = label,
+                        contentDescription = label.translated(appLanguage),
                         tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 },
                 label = {
                     Text(
-                        text = label,
+                        text = label.translated(appLanguage),
                         fontSize = 11.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                         color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant

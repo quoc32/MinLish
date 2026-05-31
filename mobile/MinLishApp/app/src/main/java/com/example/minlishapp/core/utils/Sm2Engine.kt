@@ -1,4 +1,4 @@
-package com.example.minlishapp.data
+package com.example.minlishapp.core.utils
 
 import kotlin.math.ceil
 import kotlin.math.max

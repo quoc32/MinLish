@@ -33,16 +33,31 @@ import com.example.minlishapp.data.LoginRequest
 import com.example.minlishapp.data.LoginResponse
 import com.example.minlishapp.data.RegisterRequest
 import com.example.minlishapp.data.GoogleLoginRequest
-import com.example.minlishapp.data.TokenManager
+import com.example.minlishapp.data.ForgotPasswordRequest
+import com.example.minlishapp.core.network.TokenManager
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
+import com.example.minlishapp.core.utils.translated
+
+fun getFriendlyErrorMessage(rawMsg: String?, appLanguage: String): String {
+    if (rawMsg == null) return "Có lỗi xảy ra, vui lòng thử lại sau.".translated(appLanguage)
+    val msg = rawMsg.lowercase()
+    return when {
+        msg.contains("invalid login credentials") || msg.contains("invalid credentials") || msg.contains("invalid_credentials") -> "Email hoặc mật khẩu không chính xác!".translated(appLanguage)
+        msg.contains("email not confirmed") -> "Địa chỉ email chưa được xác nhận!".translated(appLanguage)
+        msg.contains("user already exists") || msg.contains("email already in use") || msg.contains("already registered") -> "Tài khoản email này đã được sử dụng!".translated(appLanguage)
+        msg.contains("password should be") || msg.contains("weak password") -> "Mật khẩu quá yếu! Yêu cầu ít nhất 6 ký tự.".translated(appLanguage)
+        else -> rawMsg
+    }
+}
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: (userId: String, email: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
-    onNavigate: (Screen) -> Unit
+    onNavigate: (Screen) -> Unit,
+    appLanguage: String = "Vietnamese"
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -61,6 +76,13 @@ fun LoginScreen(
     
     // Validation Error Message
     var errorMessage by remember { mutableStateOf("") }
+
+    // Forgot Password States
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var forgotPasswordEmail by remember { mutableStateOf("") }
+    var isSendingForgotPassword by remember { mutableStateOf(false) }
+    var forgotPasswordSuccessMessage by remember { mutableStateOf("") }
+    var forgotPasswordErrorMessage by remember { mutableStateOf("") }
 
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -98,23 +120,26 @@ fun LoginScreen(
                                     profile?.level ?: 1,
                                     profile?.streak ?: 0
                                 )
-                                Toast.makeText(context, "Đăng nhập Google thành công!", Toast.LENGTH_SHORT).show()
-                                onNavigate(Screen.Dashboard)
+                                if (profile == null) {
+                                    onNavigate(Screen.LanguageSelection)
+                                } else {
+                                    onNavigate(Screen.Dashboard)
+                                }
                             } else {
-                                errorMessage = body?.message ?: "Đăng nhập Google thất bại!"
+                                errorMessage = body?.message ?: "Đăng nhập Google thất bại!".translated(appLanguage)
                             }
                         } else {
-                            errorMessage = "Đăng nhập Google thất bại (Mã lỗi: ${response.code()})"
+                            errorMessage = "Đăng nhập Google thất bại".translated(appLanguage) + " (Mã lỗi: ${response.code()})"
                         }
                     } catch (e: Exception) {
                         isLoading = false
-                        errorMessage = "Lỗi kết nối: ${e.localizedMessage}"
+                        errorMessage = "Lỗi kết nối".translated(appLanguage) + ": ${e.localizedMessage}"
                     }
                 }
             }
         } catch (e: ApiException) {
             isLoading = false
-            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại."
+            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại.".translated(appLanguage)
         }
     }
 
@@ -172,14 +197,16 @@ fun LoginScreen(
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
+                val titleText = if (isLoginTab) "Chào mừng trở lại!" else "Tạo tài khoản mới"
                 Text(
-                    text = if (isLoginTab) "Chào mừng trở lại!" else "Tạo tài khoản mới",
+                    text = titleText.translated(appLanguage),
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
+                val subText = if (isLoginTab) "Đăng nhập để tiếp tục lộ trình học" else "Đăng ký nhanh chóng chỉ với vài bước"
                 Text(
-                    text = if (isLoginTab) "Đăng nhập để tiếp tục lộ trình học" else "Đăng ký nhanh chóng chỉ với vài bước",
+                    text = subText.translated(appLanguage),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -214,7 +241,7 @@ fun LoginScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = label,
+                            text = label.translated(appLanguage),
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
                             color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
@@ -234,7 +261,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it; errorMessage = "" },
-                    label = { Text("Địa chỉ Email") },
+                    label = { Text("Địa chỉ Email".translated(appLanguage)) },
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
@@ -252,7 +279,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it; errorMessage = "" },
-                    label = { Text("Mật khẩu") },
+                    label = { Text("Mật khẩu".translated(appLanguage)) },
                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                     trailingIcon = {
                         val image = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
@@ -278,7 +305,7 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = confirmPassword,
                         onValueChange = { confirmPassword = it; errorMessage = "" },
-                        label = { Text("Xác nhận mật khẩu") },
+                        label = { Text("Xác nhận mật khẩu".translated(appLanguage)) },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         trailingIcon = {
                             val image = if (isConfirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
@@ -301,6 +328,24 @@ fun LoginScreen(
                 }
             }
 
+            // Quên mật khẩu link
+            if (isLoginTab) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Text(
+                        text = "Quên mật khẩu?".translated(appLanguage),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable { showForgotPasswordDialog = true }
+                            .padding(vertical = 4.dp, horizontal = 4.dp)
+                    )
+                }
+            }
+
             // Error display
             if (errorMessage.isNotEmpty()) {
                 Text(
@@ -317,13 +362,13 @@ fun LoginScreen(
             Button(
                 onClick = {
                     if (email.isBlank() || password.isBlank()) {
-                        errorMessage = "Vui lòng nhập đầy đủ thông tin!"
+                        errorMessage = "Vui lòng nhập đầy đủ thông tin!".translated(appLanguage)
                     } else if (!email.contains("@") || !email.contains(".")) {
-                        errorMessage = "Địa chỉ email không hợp lệ!"
+                        errorMessage = "Địa chỉ email không hợp lệ!".translated(appLanguage)
                     } else if (password.length < 6) {
-                        errorMessage = "Mật khẩu phải chứa ít nhất 6 ký tự!"
+                        errorMessage = "Mật khẩu phải chứa ít nhất 6 ký tự!".translated(appLanguage)
                     } else if (!isLoginTab && password != confirmPassword) {
-                        errorMessage = "Mật khẩu xác nhận không khớp!"
+                        errorMessage = "Mật khẩu xác nhận không khớp!".translated(appLanguage)
                     } else {
                         if (isLoginTab) {
                             isLoading = true
@@ -347,10 +392,13 @@ fun LoginScreen(
                                                 profile?.level ?: 1,
                                                 profile?.streak ?: 0
                                             )
-                                            Toast.makeText(context, "Đăng nhập thành công!", Toast.LENGTH_SHORT).show()
-                                            onNavigate(Screen.Dashboard)
+                                            if (profile == null) {
+                                                onNavigate(Screen.LanguageSelection)
+                                            } else {
+                                                onNavigate(Screen.Dashboard)
+                                            }
                                         } else {
-                                            errorMessage = body?.message ?: "Đăng nhập thất bại!"
+                                            errorMessage = getFriendlyErrorMessage(body?.message ?: "Đăng nhập thất bại!", appLanguage)
                                         }
                                     } else {
                                         val errorJson = response.errorBody()?.string()
@@ -359,11 +407,11 @@ fun LoginScreen(
                                         } catch (jsonEx: Exception) {
                                             null
                                         }
-                                        errorMessage = errorMsg ?: "Đăng nhập thất bại (Mã lỗi: ${response.code()})"
+                                        errorMessage = getFriendlyErrorMessage(errorMsg ?: "Đăng nhập thất bại (Mã lỗi: ${response.code()})", appLanguage)
                                     }
                                 } catch (e: Exception) {
                                     isLoading = false
-                                    errorMessage = "Lỗi kết nối: ${e.localizedMessage ?: "Không thể kết nối tới máy chủ"}"
+                                    errorMessage = "Lỗi kết nối".translated(appLanguage) + ": ${e.localizedMessage ?: "Không thể kết nối tới máy chủ"}"
                                 }
                             }
                         } else {
@@ -391,10 +439,10 @@ fun LoginScreen(
                                                 profile?.level ?: 1,
                                                 profile?.streak ?: 0
                                             )
-                                            Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
-                                            onNavigate(Screen.Dashboard)
+                                            Toast.makeText(context, "Đăng ký thành công!".translated(appLanguage), Toast.LENGTH_SHORT).show()
+                                            onNavigate(Screen.LanguageSelection)
                                         } else {
-                                            errorMessage = body?.message ?: "Đăng ký thất bại!"
+                                            errorMessage = getFriendlyErrorMessage(body?.message ?: "Đăng ký thất bại!", appLanguage)
                                         }
                                     } else {
                                         val errorJson = response.errorBody()?.string()
@@ -403,11 +451,11 @@ fun LoginScreen(
                                         } catch (jsonEx: Exception) {
                                             null
                                         }
-                                        errorMessage = errorMsg ?: "Đăng ký thất bại (Mã lỗi: ${response.code()})"
+                                        errorMessage = getFriendlyErrorMessage(errorMsg ?: "Đăng ký thất bại (Mã lỗi: ${response.code()})", appLanguage)
                                     }
                                 } catch (e: Exception) {
                                     isLoading = false
-                                    errorMessage = "Lỗi kết nối: ${e.localizedMessage ?: "Không thể kết nối tới máy chủ"}"
+                                    errorMessage = "Lỗi kết nối".translated(appLanguage) + ": ${e.localizedMessage ?: "Không thể kết nối tới máy chủ"}"
                                 }
                             }
                         }
@@ -426,8 +474,9 @@ fun LoginScreen(
                         strokeWidth = 2.dp
                     )
                 } else {
+                    val submitText = if (isLoginTab) "Đăng nhập" else "Đăng ký"
                     Text(
-                        text = if (isLoginTab) "Đăng nhập" else "Đăng ký",
+                        text = submitText.translated(appLanguage),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -449,7 +498,7 @@ fun LoginScreen(
                             .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
                     )
                     Text(
-                        text = "hoặc",
+                        text = "hoặc".translated(appLanguage),
                         modifier = Modifier.padding(horizontal = 16.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp
@@ -499,7 +548,7 @@ fun LoginScreen(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Đăng nhập với Google",
+                            text = "Đăng nhập với Google".translated(appLanguage),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -509,7 +558,130 @@ fun LoginScreen(
             }
 
         }
+
+        if (showForgotPasswordDialog) {
+            Dialog(
+                onDismissRequest = { 
+                    showForgotPasswordDialog = false
+                    forgotPasswordEmail = ""
+                    forgotPasswordSuccessMessage = ""
+                    forgotPasswordErrorMessage = ""
+                }
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Khôi phục mật khẩu".translated(appLanguage),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        
+                        Text(
+                            text = "Nhập địa chỉ email của bạn. Chúng tôi sẽ gửi một liên kết đổi mật khẩu mới.".translated(appLanguage),
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        OutlinedTextField(
+                            value = forgotPasswordEmail,
+                            onValueChange = { 
+                                forgotPasswordEmail = it
+                                forgotPasswordErrorMessage = ""
+                            },
+                            label = { Text("Email khôi phục".translated(appLanguage)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        
+                        if (forgotPasswordSuccessMessage.isNotEmpty()) {
+                            Text(
+                                text = forgotPasswordSuccessMessage,
+                                color = Color(0xFF4CAF50),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                        if (forgotPasswordErrorMessage.isNotEmpty()) {
+                            Text(
+                                text = forgotPasswordErrorMessage,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(
+                                onClick = { 
+                                    showForgotPasswordDialog = false
+                                    forgotPasswordEmail = ""
+                                    forgotPasswordSuccessMessage = ""
+                                    forgotPasswordErrorMessage = ""
+                                }
+                            ) {
+                                Text("Hủy".translated(appLanguage))
+                            }
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            Button(
+                                onClick = {
+                                    if (forgotPasswordEmail.isBlank() || !forgotPasswordEmail.contains("@")) {
+                                        forgotPasswordErrorMessage = "Email không hợp lệ!".translated(appLanguage)
+                                        return@Button
+                                    }
+                                    isSendingForgotPassword = true
+                                    forgotPasswordErrorMessage = ""
+                                    forgotPasswordSuccessMessage = ""
+                                    coroutineScope.launch {
+                                        try {
+                                            val response = authRepository.forgotPassword(
+                                                com.example.minlishapp.data.ForgotPasswordRequest(forgotPasswordEmail)
+                                            )
+                                            isSendingForgotPassword = false
+                                            if (response.isSuccessful && response.body()?.success == true) {
+                                                forgotPasswordSuccessMessage = "Đã gửi liên kết khôi phục tới email của bạn!".translated(appLanguage)
+                                            } else {
+                                                forgotPasswordErrorMessage = response.body()?.message ?: "Gửi email khôi phục thất bại!".translated(appLanguage)
+                                            }
+                                        } catch (e: Exception) {
+                                            isSendingForgotPassword = false
+                                            forgotPasswordErrorMessage = "Lỗi kết nối".translated(appLanguage) + ": ${e.localizedMessage}"
+                                        }
+                                    }
+                                },
+                                enabled = !isSendingForgotPassword,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                if (isSendingForgotPassword) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    Text("Gửi liên kết".translated(appLanguage))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
-
-
 }

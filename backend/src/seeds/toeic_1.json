@@ -1,0 +1,22 @@
+{
+  "deck": {
+    "name": "TOEIC Basic 1",
+    "icon": "🏢",
+    "tag": "Basic",
+    "target_goal": "TOEIC"
+  },
+  "cards": [
+    {"word": "Accommodate", "pronunciation": "/əˈkɒmədeɪt/", "meaning": "Cung cấp chỗ ở, đáp ứng", "example": "The hotel can accommodate up to 500 guests."},
+    {"word": "Acquisition", "pronunciation": "/ˌækwɪˈzɪʃn/", "meaning": "Sự mua lại, thâu tóm", "example": "The acquisition of the new company was successful."},
+    {"word": "Agenda", "pronunciation": "/əˈdʒendə/", "meaning": "Chương trình nghị sự", "example": "What is on the agenda for today's meeting?"},
+    {"word": "Agreement", "pronunciation": "/əˈɡriːmənt/", "meaning": "Hợp đồng, thỏa thuận", "example": "Please sign the agreement by Friday."},
+    {"word": "Allocate", "pronunciation": "/ˈæləkeɪt/", "meaning": "Phân bổ", "example": "We need to allocate more funds to marketing."},
+    {"word": "Appoint", "pronunciation": "/əˈpɔɪnt/", "meaning": "Bổ nhiệm, chỉ định", "example": "They will appoint a new manager soon."},
+    {"word": "Appraisal", "pronunciation": "/əˈpreɪzl/", "meaning": "Sự đánh giá", "example": "Performance appraisals are done annually."},
+    {"word": "Asset", "pronunciation": "/ˈæset/", "meaning": "Tài sản", "example": "Our employees are our greatest asset."},
+    {"word": "Audit", "pronunciation": "/ˈɔːdɪt/", "meaning": "Kiểm toán", "example": "The company is undergoing a financial audit."},
+    {"word": "Authorization", "pronunciation": "/ˌɔːθəraɪˈzeɪʃn/", "meaning": "Sự ủy quyền", "example": "You need authorization to access this file."},
+    {"word": "Beneficiary", "pronunciation": "/ˌbenɪˈfɪʃəri/", "meaning": "Người thụ hưởng", "example": "He is the main beneficiary of the will."},
+    {"word": "Brainstorm", "pronunciation": "/ˈbreɪnstɔːm/", "meaning": "Động não", "example": "Let's brainstorm some ideas for the project."}
+  ]
+}

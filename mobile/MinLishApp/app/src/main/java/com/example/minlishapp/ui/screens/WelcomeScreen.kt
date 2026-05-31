@@ -32,8 +32,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.minlishapp.R
 import com.example.minlishapp.data.GoogleLoginRequest
-import com.example.minlishapp.data.TokenManager
+import com.example.minlishapp.core.network.TokenManager
 import com.example.minlishapp.data.repository.AuthRepository
+import com.example.minlishapp.core.utils.translated
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -69,7 +70,8 @@ fun RedWhiteEmailIcon(modifier: Modifier = Modifier) {
 @Composable
 fun WelcomeScreen(
     onLoginSuccess: (userId: String, email: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
-    onNavigate: (Screen) -> Unit
+    onNavigate: (Screen) -> Unit,
+    appLanguage: String = "Vietnamese"
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -113,23 +115,26 @@ fun WelcomeScreen(
                                     profile?.level ?: 1,
                                     profile?.streak ?: 0
                                 )
-                                Toast.makeText(context, "Đăng nhập Google thành công!", Toast.LENGTH_SHORT).show()
-                                onNavigate(Screen.Dashboard)
+                                if (profile == null) {
+                                    onNavigate(Screen.LanguageSelection)
+                                } else {
+                                    onNavigate(Screen.Dashboard)
+                                }
                             } else {
-                                errorMessage = body?.message ?: "Đăng nhập Google thất bại!"
+                                errorMessage = body?.message ?: "Đăng nhập Google thất bại!".translated(appLanguage)
                             }
                         } else {
-                            errorMessage = "Đăng nhập Google thất bại (Mã lỗi: ${response.code()})"
+                            errorMessage = "Đăng nhập Google thất bại".translated(appLanguage) + " (Mã lỗi: ${response.code()})"
                         }
                     } catch (e: Exception) {
                         isLoading = false
-                        errorMessage = "Lỗi kết nối: ${e.localizedMessage}"
+                        errorMessage = "Lỗi kết nối".translated(appLanguage) + ": ${e.localizedMessage}"
                     }
                 }
             }
         } catch (e: ApiException) {
             isLoading = false
-            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại."
+            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại.".translated(appLanguage)
         }
     }
 
@@ -179,14 +184,14 @@ fun WelcomeScreen(
                 }
                 Spacer(modifier = Modifier.height(if (isSmallScreen) 12.dp else 20.dp))
                 Text(
-                    text = "Chào mừng tới MinLish",
+                    text = "Chào mừng tới MinLish".translated(appLanguage),
                     fontSize = if (isSmallScreen) 22.sp else 28.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.height(if (isSmallScreen) 8.dp else 12.dp))
                 Text(
-                    text = "Phương pháp Spaced Repetition (SM-2) kết hợp trò chơi hóa giúp bạn học từ vựng tiếng Anh không bao giờ quên.",
+                    text = "Phương pháp Spaced Repetition (SM-2) kết hợp trò chơi hóa giúp bạn học từ vựng tiếng Anh không bao giờ quên.".translated(appLanguage),
                     fontSize = if (isSmallScreen) 13.sp else 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -248,7 +253,7 @@ fun WelcomeScreen(
                     RedWhiteEmailIcon()
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Đăng nhập",
+                        text = "Đăng nhập".translated(appLanguage),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White

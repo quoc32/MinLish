@@ -29,15 +29,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.minlishapp.data.Deck
 import com.example.minlishapp.data.Word
-import com.example.minlishapp.data.Sm2Engine
+import com.example.minlishapp.core.utils.Sm2Engine
+import com.example.minlishapp.core.utils.translated
 import com.example.minlishapp.ui.theme.*
+
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
 fun FlashcardScreen(
     activeDeck: Deck?,
-    onNavigate: (Screen) -> Unit
+    onNavigate: (Screen) -> Unit,
+    onSubmitReview: (cardId: String, quality: String) -> Unit,
+    userProgress: com.example.minlishapp.data.UserProgress
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -61,7 +65,11 @@ fun FlashcardScreen(
     fun speak(text: String, isUk: Boolean = false) {
         tts?.let {
             it.language = if (isUk) java.util.Locale.UK else java.util.Locale.US
-            it.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+            it.setSpeechRate(0.85f)
+            it.setPitch(1.0f)
+            val params = android.os.Bundle()
+            params.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+            it.speak(text, TextToSpeech.QUEUE_FLUSH, params, null)
         }
     }
 
@@ -79,7 +87,7 @@ fun FlashcardScreen(
     var currentStep by remember { mutableStateOf(1) }
     
     // Trạng thái cho Bước 1: Flashcard
-    var isFlipped by remember { mutableStateOf(false) }
+    var isFlipped by remember(currentIndex) { mutableStateOf(false) }
     val rotation by animateFloatAsState(
         targetValue = if (isFlipped) 180f else 0f,
         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
@@ -87,14 +95,20 @@ fun FlashcardScreen(
     )
 
     // Trạng thái cho Bước 2: Trắc nghiệm
-    var selectedOptionIndex by remember { mutableStateOf<Int?>(null) }
-    var isMcAnswerChecked by remember { mutableStateOf(false) }
+    var selectedOptionIndex by remember(currentIndex) { mutableStateOf<Int?>(null) }
+    var isMcAnswerChecked by remember(currentIndex) { mutableStateOf(false) }
+    var mcAttemptCount by remember(currentIndex) { mutableStateOf(0) }
+    var isMcFirstTimeWrong by remember(currentIndex) { mutableStateOf(false) }
+    val mcSelectedWrongOptions = remember(currentIndex) { mutableStateListOf<Int>() }
 
     // Trạng thái cho Bước 3: Gõ từ
-    var typingInput by remember { mutableStateOf("") }
-    var isTypingChecked by remember { mutableStateOf(false) }
-    var isTypingCorrect by remember { mutableStateOf(false) }
-    var showTypingHint by remember { mutableStateOf(false) }
+    var typingInput by remember(currentIndex) { mutableStateOf("") }
+    var isTypingChecked by remember(currentIndex) { mutableStateOf(false) }
+    var isTypingCorrect by remember(currentIndex) { mutableStateOf(false) }
+    var showTypingHint by remember(currentIndex) { mutableStateOf(false) }
+    
+    // Trạng thái hiển thị đánh giá SM-2 cho từ hiện tại
+    var showSm2ForCurrentWord by remember(currentIndex) { mutableStateOf(false) }
 
     // Khi hoàn thành học tất cả các từ trong Deck
     if (studyWords.isEmpty() || currentIndex >= studyWords.size) {
@@ -216,7 +230,207 @@ fun FlashcardScreen(
                     .padding(vertical = 20.dp),
                 contentAlignment = Alignment.Center
             ) {
-                when (currentStep) {
+                if (showSm2ForCurrentWord) {
+                    Card(
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxSize(),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp)
+                                .verticalScroll(rememberScrollState()),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
+                        ) {
+                            Text(
+                                text = currentWord.word,
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = "(${currentWord.wordType}) ${currentWord.pronunciation}",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontStyle = FontStyle.Italic,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = currentWord.meaning,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = "Đánh giá mức độ dễ nhớ của từ:".translated(userProgress.appLanguage),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+
+                            class Sm2OptionData(val score: Int, val color: Color, val label: String)
+                            val sm2Options = listOf(
+                                Sm2OptionData(0, ColorAgain, "Học lại (<1m)".translated(userProgress.appLanguage)),
+                                Sm2OptionData(3, ColorHard, "Khó (10m)".translated(userProgress.appLanguage)),
+                                Sm2OptionData(4, ColorGood, "Tốt (1d)".translated(userProgress.appLanguage)),
+                                Sm2OptionData(5, ColorEasy, "Dễ (4d)".translated(userProgress.appLanguage))
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                val optAgain = sm2Options[0]
+                                val optHard = sm2Options[1]
+                                Card(
+                                    onClick = {
+                                        onSubmitReview(currentWord.id, "again")
+                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optAgain.score)
+                                        currentWord.repetitions = res.first
+                                        currentWord.easeFactor = res.second
+                                        currentWord.intervalDays = res.third
+                                        
+                                        studyWords.add(currentWord.copy())
+                                        
+                                        isFlipped = false
+                                        currentStep = 1
+                                        currentIndex++
+                                        typingInput = ""
+                                        isTypingChecked = false
+                                        showTypingHint = false
+                                        selectedOptionIndex = null
+                                        isMcAnswerChecked = false
+                                        mcAttemptCount = 0
+                                        mcSelectedWrongOptions.clear()
+                                        isMcFirstTimeWrong = false
+                                        showSm2ForCurrentWord = false
+                                    },
+                                    colors = CardDefaults.cardColors(containerColor = optAgain.color.copy(alpha = 0.08f)),
+                                    border = BorderStroke(1.dp, optAgain.color),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(text = optAgain.label, color = optAgain.color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                }
+
+                                Card(
+                                    onClick = {
+                                        onSubmitReview(currentWord.id, "hard")
+                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optHard.score)
+                                        currentWord.repetitions = res.first
+                                        currentWord.easeFactor = res.second
+                                        currentWord.intervalDays = res.third
+                                        
+                                        isFlipped = false
+                                        currentStep = 1
+                                        currentIndex++
+                                        typingInput = ""
+                                        isTypingChecked = false
+                                        showTypingHint = false
+                                        selectedOptionIndex = null
+                                        isMcAnswerChecked = false
+                                        mcAttemptCount = 0
+                                        mcSelectedWrongOptions.clear()
+                                        isMcFirstTimeWrong = false
+                                        showSm2ForCurrentWord = false
+                                    },
+                                    colors = CardDefaults.cardColors(containerColor = optHard.color.copy(alpha = 0.08f)),
+                                    border = BorderStroke(1.dp, optHard.color),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(text = optHard.label, color = optHard.color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                val optGood = sm2Options[2]
+                                val optEasy = sm2Options[3]
+                                Card(
+                                    onClick = {
+                                        onSubmitReview(currentWord.id, "good")
+                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optGood.score)
+                                        currentWord.repetitions = res.first
+                                        currentWord.easeFactor = res.second
+                                        currentWord.intervalDays = res.third
+                                        
+                                        isFlipped = false
+                                        currentStep = 1
+                                        currentIndex++
+                                        typingInput = ""
+                                        isTypingChecked = false
+                                        showTypingHint = false
+                                        selectedOptionIndex = null
+                                        isMcAnswerChecked = false
+                                        mcAttemptCount = 0
+                                        mcSelectedWrongOptions.clear()
+                                        isMcFirstTimeWrong = false
+                                        showSm2ForCurrentWord = false
+                                    },
+                                    colors = CardDefaults.cardColors(containerColor = optGood.color.copy(alpha = 0.08f)),
+                                    border = BorderStroke(1.dp, optGood.color),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(text = optGood.label, color = optGood.color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                }
+
+                                Card(
+                                    onClick = {
+                                        onSubmitReview(currentWord.id, "easy")
+                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optEasy.score)
+                                        currentWord.repetitions = res.first
+                                        currentWord.easeFactor = res.second
+                                        currentWord.intervalDays = res.third
+                                        
+                                        isFlipped = false
+                                        currentStep = 1
+                                        currentIndex++
+                                        typingInput = ""
+                                        isTypingChecked = false
+                                        showTypingHint = false
+                                        selectedOptionIndex = null
+                                        isMcAnswerChecked = false
+                                        mcAttemptCount = 0
+                                        mcSelectedWrongOptions.clear()
+                                        isMcFirstTimeWrong = false
+                                        showSm2ForCurrentWord = false
+                                    },
+                                    colors = CardDefaults.cardColors(containerColor = optEasy.color.copy(alpha = 0.08f)),
+                                    border = BorderStroke(1.dp, optEasy.color),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(text = optEasy.label, color = optEasy.color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    when (currentStep) {
                     // ------------------------------------------
                     // BƯỚC 1: FLASHCARD (FRONT/BACK FLIP)
                     // ------------------------------------------
@@ -328,7 +542,7 @@ fun FlashcardScreen(
                                     Spacer(modifier = Modifier.height(48.dp))
 
                                     Text(
-                                        text = "Nhấn để xem nghĩa",
+                                        text = "Nhấn để xem nghĩa".translated(userProgress.appLanguage),
                                         fontSize = 14.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                         fontWeight = FontWeight.Medium
@@ -387,7 +601,7 @@ fun FlashcardScreen(
                                     if (currentWord.collocations.isNotEmpty()) {
                                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                             Text(
-                                                text = "Cụm từ đi kèm (Collocations)",
+                                                text = "Cụm từ đi kèm (Collocations)".translated(userProgress.appLanguage),
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.primary
@@ -419,7 +633,7 @@ fun FlashcardScreen(
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             Text(
-                                                text = "Đồng nghĩa:",
+                                                text = "Đồng nghĩa:".translated(userProgress.appLanguage),
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -463,9 +677,10 @@ fun FlashcardScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(24.dp),
+                                    .padding(24.dp)
+                                    .verticalScroll(rememberScrollState()),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterVertically)
+                                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
                             ) {
                                 // Phần trên: Từ vựng & Phát âm
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -484,7 +699,16 @@ fun FlashcardScreen(
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(16.dp))
+                                if (isMcFirstTimeWrong && !isMcAnswerChecked) {
+                                    Text(
+                                        text = "Gợi ý: Từ bắt đầu bằng chữ".translated(userProgress.appLanguage) + " '${currentWord.word.take(1).uppercase()}'",
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                    )
+                                }
 
                                 // Phần giữa: 4 đáp án trắc nghiệm
                                 Column(
@@ -498,14 +722,14 @@ fun FlashcardScreen(
                                         // Tính toán màu nền và viền dựa trên kết quả kiểm tra
                                         val cardColor = when {
                                             isMcAnswerChecked && isCorrectOption -> Color(0xFFD1FAE5) // Xanh lục nhạt khi đúng
-                                            isMcAnswerChecked && isSelected && !isCorrectOption -> Color(0xFFFEE2E2) // Đỏ nhạt khi sai
+                                            mcSelectedWrongOptions.contains(optIndex) -> Color(0xFFFEE2E2) // Đỏ nhạt khi chọn sai
                                             isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                                             else -> MaterialTheme.colorScheme.surface
                                         }
 
                                         val borderColor = when {
                                             isMcAnswerChecked && isCorrectOption -> Color(0xFF10B981)
-                                            isMcAnswerChecked && isSelected && !isCorrectOption -> Color(0xFFEF4444)
+                                            mcSelectedWrongOptions.contains(optIndex) -> Color(0xFFEF4444)
                                             isSelected -> MaterialTheme.colorScheme.primary
                                             else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                                         }
@@ -514,14 +738,18 @@ fun FlashcardScreen(
                                             onClick = {
                                                 if (!isMcAnswerChecked) {
                                                     selectedOptionIndex = optIndex
-                                                    isMcAnswerChecked = true
+                                                    val isCorrect = optionText == currentWord.meaning
                                                     
-                                                    // Tự động chuyển qua bước tiếp theo sau khi phản hồi
-                                                    coroutineScope.launch {
-                                                        delay(if (isCorrectOption) 1000 else 2000)
-                                                        currentStep = 3 // Gõ từ
-                                                        selectedOptionIndex = null
-                                                        isMcAnswerChecked = false
+                                                    if (isCorrect) {
+                                                        isMcAnswerChecked = true
+                                                    } else {
+                                                        mcAttemptCount++
+                                                        mcSelectedWrongOptions.add(optIndex)
+                                                        if (mcAttemptCount == 1) {
+                                                            isMcFirstTimeWrong = true
+                                                        } else {
+                                                            isMcAnswerChecked = true
+                                                        }
                                                     }
                                                 }
                                             },
@@ -619,7 +847,7 @@ fun FlashcardScreen(
                                 OutlinedTextField(
                                     value = typingInput,
                                     onValueChange = { if (!isTypingChecked) typingInput = it },
-                                    placeholder = { Text("Gõ từ tiếng Anh...") },
+                                    placeholder = { Text("Gõ từ tiếng Anh...".translated(userProgress.appLanguage)) },
                                     singleLine = true,
                                     enabled = !isTypingChecked,
                                     textStyle = androidx.compose.ui.text.TextStyle(
@@ -645,7 +873,7 @@ fun FlashcardScreen(
                                 // Hiển thị gợi ý nếu bật
                                 AnimatedVisibility(visible = showTypingHint && !isTypingChecked) {
                                     Text(
-                                        text = "Gợi ý: Từ bắt đầu bằng '${currentWord.word.take(2)}...' và có ${currentWord.word.length} chữ cái.",
+                                        text = "Gợi ý: Từ bắt đầu bằng".translated(userProgress.appLanguage) + " '${currentWord.word.take(2)}...' " + "và có".translated(userProgress.appLanguage) + " ${currentWord.word.length} " + "chữ cái.".translated(userProgress.appLanguage),
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.primary,
                                         fontWeight = FontWeight.Medium
@@ -655,7 +883,7 @@ fun FlashcardScreen(
                                 // Hiển thị kết quả sai
                                 if (isTypingChecked && !isTypingCorrect) {
                                     Text(
-                                        text = "Đáp án đúng: ${currentWord.word}",
+                                        text = "Đáp án đúng:".translated(userProgress.appLanguage) + " ${currentWord.word}",
                                         fontSize = 15.sp,
                                         color = Color(0xFFEF4444),
                                         fontWeight = FontWeight.Bold
@@ -682,19 +910,6 @@ fun FlashcardScreen(
                                             )
                                         }
 
-                                        // Nút Bỏ qua
-                                        OutlinedButton(
-                                            onClick = {
-                                                isTypingChecked = true
-                                                isTypingCorrect = false
-                                                typingInput = ""
-                                                focusManager.clearFocus()
-                                            },
-                                            shape = RoundedCornerShape(12.dp),
-                                            modifier = Modifier.height(48.dp)
-                                        ) {
-                                            Text("Bỏ qua", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                        }
 
                                         // Nút kiểm tra
                                         Button(
@@ -710,171 +925,7 @@ fun FlashcardScreen(
                                                 .weight(1f)
                                                 .height(48.dp)
                                         ) {
-                                            Text("Kiểm tra", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                        }
-                                    }
-                                } else {
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    // Khung đánh giá riêng biệt nổi bật
-                                    Card(
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                                        ),
-                                        shape = RoundedCornerShape(16.dp),
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(16.dp),
-                                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            Text(
-                                                text = "Đánh giá mức độ dễ nhớ của từ:",
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                textAlign = TextAlign.Center
-                                            )
-
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            
-                                            class Sm2Option(val score: Int, val color: Color, val label: String)
-                                            val sm2Options = listOf(
-                                                Sm2Option(0, ColorAgain, "Học lại (<1m)"),
-                                                Sm2Option(3, ColorHard, "Khó (10m)"),
-                                                Sm2Option(4, ColorGood, "Tốt (1d)"),
-                                                Sm2Option(5, ColorEasy, "Dễ (4d)")
-                                            )
-                                            
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                // Học lại & Khó
-                                                val optAgain = sm2Options[0]
-                                                val optHard = sm2Options[1]
-                                                
-                                                Card(
-                                                    onClick = {
-                                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optAgain.score)
-                                                        currentWord.repetitions = res.first
-                                                        currentWord.easeFactor = res.second
-                                                        currentWord.intervalDays = res.third
-                                                        
-                                                        // Chuyển từ tiếp theo
-                                                        isFlipped = false
-                                                        currentStep = 1
-                                                        currentIndex++
-                                                        typingInput = ""
-                                                        isTypingChecked = false
-                                                        showTypingHint = false
-                                                    },
-                                                    colors = CardDefaults.cardColors(containerColor = optAgain.color.copy(alpha = 0.08f)),
-                                                    border = BorderStroke(1.dp, optAgain.color),
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .height(48.dp)
-                                                ) {
-                                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                        Text(text = optAgain.label, color = optAgain.color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                                    }
-                                                }
-                                                
-                                                Card(
-                                                    onClick = {
-                                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optHard.score)
-                                                        currentWord.repetitions = res.first
-                                                        currentWord.easeFactor = res.second
-                                                        currentWord.intervalDays = res.third
-                                                        
-                                                        // Chuyển từ tiếp theo
-                                                        isFlipped = false
-                                                        currentStep = 1
-                                                        currentIndex++
-                                                        typingInput = ""
-                                                        isTypingChecked = false
-                                                        showTypingHint = false
-                                                    },
-                                                    colors = CardDefaults.cardColors(containerColor = optHard.color.copy(alpha = 0.08f)),
-                                                    border = BorderStroke(1.dp, optHard.color),
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .height(48.dp)
-                                                ) {
-                                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                        Text(text = optHard.label, color = optHard.color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                                    }
-                                                }
-                                            }
-                                            
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                // Tốt & Dễ
-                                                val optGood = sm2Options[2]
-                                                val optEasy = sm2Options[3]
-                                                
-                                                Card(
-                                                    onClick = {
-                                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optGood.score)
-                                                        currentWord.repetitions = res.first
-                                                        currentWord.easeFactor = res.second
-                                                        currentWord.intervalDays = res.third
-                                                        
-                                                        // Chuyển từ tiếp theo
-                                                        isFlipped = false
-                                                        currentStep = 1
-                                                        currentIndex++
-                                                        typingInput = ""
-                                                        isTypingChecked = false
-                                                        showTypingHint = false
-                                                    },
-                                                    colors = CardDefaults.cardColors(containerColor = optGood.color.copy(alpha = 0.08f)),
-                                                    border = BorderStroke(1.dp, optGood.color),
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .height(48.dp)
-                                                ) {
-                                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                        Text(text = optGood.label, color = optGood.color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                                    }
-                                                }
-                                                
-                                                Card(
-                                                    onClick = {
-                                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optEasy.score)
-                                                        currentWord.repetitions = res.first
-                                                        currentWord.easeFactor = res.second
-                                                        currentWord.intervalDays = res.third
-                                                        
-                                                        // Chuyển từ tiếp theo
-                                                        isFlipped = false
-                                                        currentStep = 1
-                                                        currentIndex++
-                                                        typingInput = ""
-                                                        isTypingChecked = false
-                                                        showTypingHint = false
-                                                    },
-                                                    colors = CardDefaults.cardColors(containerColor = optEasy.color.copy(alpha = 0.08f)),
-                                                    border = BorderStroke(1.dp, optEasy.color),
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .height(48.dp)
-                                                ) {
-                                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                        Text(text = optEasy.label, color = optEasy.color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                                    }
-                                                }
-                                            }
+                                            Text("Kiểm tra".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                         }
                                     }
                                 }
@@ -883,6 +934,7 @@ fun FlashcardScreen(
                     }
                 }
             }
+        }
 
             // ==========================================
             // BOTTOM CONTROL / HELPER / PROGRESS STATUS
@@ -892,8 +944,10 @@ fun FlashcardScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Các nút hành động cho Bước 1: Flashcard
-                if (currentStep == 1) {
+                // Các nút hành động cho từng bước học
+                if (showSm2ForCurrentWord) {
+                    // Đang hiển thị bảng chọn SM-2 ở thẻ chính, không cần nút phụ
+                } else if (currentStep == 1) {
                     if (!isFlipped) {
                         Button(
                             onClick = { isFlipped = true },
@@ -902,17 +956,16 @@ fun FlashcardScreen(
                                 .height(52.dp),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Text("Lật Thẻ", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("Lật Thẻ".translated(userProgress.appLanguage), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         }
                     } else {
-                        // Nút mặt sau
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             OutlinedButton(
                                 onClick = {
-                                    currentStep = 2 // Chuyển qua Trắc nghiệm
+                                    showSm2ForCurrentWord = true
                                 },
                                 shape = RoundedCornerShape(14.dp),
                                 border = BorderStroke(1.dp, Color(0xFF10B981)),
@@ -924,7 +977,7 @@ fun FlashcardScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(imageVector = Icons.Default.Check, contentDescription = "Mastered", modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Đã thuộc", fontWeight = FontWeight.Bold)
+                                    Text("Đã thuộc".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold)
                                 }
                             }
 
@@ -938,30 +991,117 @@ fun FlashcardScreen(
                                     .weight(1f)
                                     .height(52.dp)
                             ) {
-                                Text("Học tiếp", fontWeight = FontWeight.Bold)
+                                Text("Học tiếp".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold)
                             }
                         }
                         
                         Text(
-                            text = "Gợi ý: Nhấn 'Đã thuộc' hoặc 'Học tiếp' để bắt đầu luyện tập",
+                            text = "Gợi ý: Nhấn 'Đã thuộc' hoặc 'Học tiếp' để bắt đầu luyện tập".translated(userProgress.appLanguage),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
-                } else {
-                    // Trợ giúp phím tắt phím ảo cho các bước game
-                    val helperLabel = when {
-                        currentStep == 2 -> "Bấm 1, 2, 3, 4 trên bàn phím hoặc chạm đáp án để chọn"
-                        currentStep == 3 && !isTypingChecked -> "Bấm Enter để kiểm tra nhanh kết quả"
-                        currentStep == 3 && isTypingChecked -> "Đánh giá khả năng nhớ từ của bạn"
-                        else -> "Đánh giá khả năng nhớ từ của bạn"
+                } else if (currentStep == 2) {
+                    if (isMcAnswerChecked) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    showSm2ForCurrentWord = true
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, Color(0xFF10B981)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF10B981)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(imageVector = Icons.Default.Check, contentDescription = "Mastered", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Đã thuộc".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    currentStep = 3 // Chuyển qua Viết từ
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                            ) {
+                                Text("Học tiếp".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "Bấm 1, 2, 3, 4 trên bàn phím hoặc chạm đáp án để chọn".translated(userProgress.appLanguage),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            textAlign = TextAlign.Center
+                        )
                     }
-                    Text(
-                        text = helperLabel,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        textAlign = TextAlign.Center
-                    )
+                } else if (currentStep == 3) {
+                    if (isTypingChecked) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    showSm2ForCurrentWord = true
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, Color(0xFF10B981)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF10B981)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(imageVector = Icons.Default.Check, contentDescription = "Mastered", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Đã thuộc".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    // Quay lại Flashcard (Step 1) và reset states của từ hiện tại
+                                    isFlipped = false
+                                    selectedOptionIndex = null
+                                    isMcAnswerChecked = false
+                                    mcAttemptCount = 0
+                                    mcSelectedWrongOptions.clear()
+                                    isMcFirstTimeWrong = false
+                                    typingInput = ""
+                                    isTypingChecked = false
+                                    isTypingCorrect = false
+                                    showTypingHint = false
+                                    currentStep = 1
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                            ) {
+                                Text("Học tiếp".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "Bấm Enter để kiểm tra nhanh kết quả".translated(userProgress.appLanguage),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -973,21 +1113,21 @@ fun FlashcardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "$newCount Từ mới",
+                        text = "$newCount " + "Từ mới".translated(userProgress.appLanguage),
                         color = Color(0xFF2563EB),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "$learnedCount Đã học",
+                        text = "$learnedCount " + "Đã học".translated(userProgress.appLanguage),
                         color = Color(0xFF7E22CE),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "$reviewCount Ôn tập",
+                        text = "$reviewCount " + "Ôn tập".translated(userProgress.appLanguage),
                         color = Color(0xFFEA580C),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp

@@ -12,5 +12,6 @@ enum class Screen {
     Flashcards,
     LessonComplete,
     Stats,
-    Profile
+    Profile,
+    ResetPassword
 }

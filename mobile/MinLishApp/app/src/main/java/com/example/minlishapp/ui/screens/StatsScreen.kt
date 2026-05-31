@@ -35,6 +35,7 @@ import com.example.minlishapp.ui.theme.ColorGood
 import com.example.minlishapp.ui.theme.ColorAgain
 import com.example.minlishapp.ui.theme.MinLishAppTheme
 import kotlinx.coroutines.launch
+import com.example.minlishapp.core.utils.translated
 
 // Interface definition for UI states
 sealed interface StatsUiState {
@@ -44,7 +45,7 @@ sealed interface StatsUiState {
 }
 
 @Composable
-fun StatsScreen(userId: String, onNavigate: (Screen) -> Unit) {
+fun StatsScreen(userId: String, appLanguage: String, onNavigate: (Screen) -> Unit) {
     val statsRepository = remember { StatsRepository.create() }
     var uiState by remember { mutableStateOf<StatsUiState>(StatsUiState.Loading) }
     val coroutineScope = rememberCoroutineScope()
@@ -74,6 +75,7 @@ fun StatsScreen(userId: String, onNavigate: (Screen) -> Unit) {
 
     StatsScreenContent(
         uiState = uiState,
+        appLanguage = appLanguage,
         onNavigate = onNavigate,
         onRetry = { fetchStats() }
     )
@@ -82,11 +84,12 @@ fun StatsScreen(userId: String, onNavigate: (Screen) -> Unit) {
 @Composable
 fun StatsScreenContent(
     uiState: StatsUiState,
+    appLanguage: String = "Vietnamese",
     onNavigate: (Screen) -> Unit,
     onRetry: () -> Unit
 ) {
     Scaffold(
-        bottomBar = { AppBottomBar(currentScreen = Screen.Stats, onNavigate = onNavigate) }
+        bottomBar = { AppBottomBar(currentScreen = Screen.Stats, onNavigate = onNavigate, appLanguage = appLanguage) }
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -118,7 +121,7 @@ fun StatsScreenContent(
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                         Button(onClick = onRetry) {
-                            Text("Thử lại")
+                            Text("Thử lại".translated(appLanguage))
                         }
                     }
                 }
@@ -135,7 +138,7 @@ fun StatsScreenContent(
                             .verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = "Thống Kê",
+                            text = "Thống Kê".translated(appLanguage),
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(bottom = 16.dp)
@@ -157,12 +160,12 @@ fun StatsScreenContent(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(text = "📚", fontSize = 20.sp)
                                     Text(text = "${donut.totalStudied}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
-                                    Text(text = "Tổng từ đã học", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(text = "Tổng từ đã học".translated(appLanguage), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(text = "🔥", fontSize = 20.sp)
-                                    Text(text = "${profile.streak} ngày", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = ColorStreakFlame)
-                                    Text(text = "Streak hiện tại", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(text = "${profile.streak} " + "ngày".translated(appLanguage), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = ColorStreakFlame)
+                                    Text(text = "Streak hiện tại".translated(appLanguage), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(text = "⚡", fontSize = 20.sp)
@@ -172,7 +175,7 @@ fun StatsScreenContent(
                                         (profile.retentionRate * 100).toInt()
                                     }
                                     Text(text = "$displayedRetentionRate%", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = ColorEasy)
-                                    Text(text = "Tỷ lệ nhớ lâu", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(text = "Tỷ lệ nhớ lâu".translated(appLanguage), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -181,7 +184,7 @@ fun StatsScreenContent(
 
                         // Biểu đồ 1: Hoạt động học tuần qua (Canvas Bar Chart nhận dữ liệu động)
                         Text(
-                            text = "Số từ ôn tập hằng ngày",
+                            text = "Số từ ôn tập hằng ngày".translated(appLanguage),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(bottom = 12.dp)
@@ -256,7 +259,7 @@ fun StatsScreenContent(
 
                         // Biểu đồ 2: Đồ thị tròn tỷ lệ nhớ (Donut Chart nhận dữ liệu động)
                         Text(
-                            text = "Tỷ lệ trạng thái từ vựng",
+                            text = "Tỷ lệ trạng thái từ vựng".translated(appLanguage),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(bottom = 12.dp)
@@ -325,7 +328,7 @@ fun StatsScreenContent(
                                         }
                                     }
                                     Text(
-                                        text = "${donut.totalStudied} từ",
+                                        text = "${donut.totalStudied} " + "từ".translated(appLanguage),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -335,9 +338,9 @@ fun StatsScreenContent(
 
                                 // Chú thích động với tỉ lệ thực tế
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    LegendRow(color = ColorEasy, label = "Thành thạo (${pctEasy}%)")
-                                    LegendRow(color = ColorGood, label = "Đang nhớ (${pctGood}%)")
-                                    LegendRow(color = ColorAgain, label = "Cần ôn gấp (${pctAgain}%)")
+                                    LegendRow(color = ColorEasy, label = "Thành thạo".translated(appLanguage) + " (${pctEasy}%)")
+                                    LegendRow(color = ColorGood, label = "Đang nhớ".translated(appLanguage) + " (${pctGood}%)")
+                                    LegendRow(color = ColorAgain, label = "Cần ôn gấp".translated(appLanguage) + " (${pctAgain}%)")
                                 }
                             }
                         }

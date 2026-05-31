@@ -1,4 +1,4 @@
-const { supabase } = require('../config/supabase');
+const notifyService = require('../services/notifyService');
 
 /**
  * Fetch all notifications for the active user
@@ -7,30 +7,17 @@ const { supabase } = require('../config/supabase');
 async function getNotifications(req, res) {
   try {
     const userId = req.user.id;
-
-    const { data: list, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'Failed to fetch notifications.',
-        error: error.message
-      });
-    }
+    const data = await notifyService.getNotifications(userId);
 
     res.status(200).json({
       success: true,
-      data: list
+      data
     });
   } catch (err) {
     console.error('Get notifications API error:', err);
-    res.status(500).json({
+    res.status(err.message.includes('Failed') ? 400 : 500).json({
       success: false,
-      message: 'Internal server error fetching notifications.'
+      message: err.message || 'Internal server error fetching notifications.'
     });
   }
 }
@@ -51,29 +38,7 @@ async function readNotification(req, res) {
       });
     }
 
-    // Update is_read = true where id = notifyId AND user_id = userId
-    const { data: updated, error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notifyId)
-      .eq('user_id', userId) // Security check: Ensure it belongs to this user
-      .select()
-      .maybeSingle();
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'Failed to update notification.',
-        error: error.message
-      });
-    }
-
-    if (!updated) {
-      return res.status(404).json({
-        success: false,
-        message: 'Notification not found or access denied.'
-      });
-    }
+    const updated = await notifyService.readNotification(userId, notifyId);
 
     res.status(200).json({
       success: true,
@@ -82,6 +47,12 @@ async function readNotification(req, res) {
     });
   } catch (err) {
     console.error('Mark notification read API error:', err);
+    if (err.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: err.message
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Internal server error updating notification.'
@@ -89,7 +60,29 @@ async function readNotification(req, res) {
   }
 }
 
+/**
+ * Send email study reminders to all users who haven't studied today
+ * POST /api/notifications/send-email-reminders
+ */
+async function sendEmailReminders(req, res) {
+  try {
+    const results = await notifyService.sendDailyStudyEmailReminders();
+    res.status(200).json({
+      success: true,
+      message: 'Study reminders process executed successfully.',
+      results
+    });
+  } catch (err) {
+    console.error('Send email reminders API error:', err);
+    res.status(500).json({
+      success: false,
+      message: err.message || 'Internal server error executing reminders.'
+    });
+  }
+}
+
 module.exports = {
   getNotifications,
-  readNotification
+  readNotification,
+  sendEmailReminders
 };

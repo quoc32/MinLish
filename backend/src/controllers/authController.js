@@ -1,4 +1,4 @@
-const { supabase } = require('../config/supabase');
+const authService = require('../services/authService');
 
 /**
  * Register a new user
@@ -6,7 +6,7 @@ const { supabase } = require('../config/supabase');
  */
 async function register(req, res) {
   try {
-    const { email, password, displayName, targetGoal } = req.body;
+    const { email, password, displayName, targetGoal, wordsPerDay } = req.body;
 
     if (!email || !password || !displayName) {
       return res.status(400).json({
@@ -15,63 +15,18 @@ async function register(req, res) {
       });
     }
 
-    // 1. Register user in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password
-    });
-
-    if (authError || !authData.user) {
-      return res.status(400).json({
-        success: false,
-        message: authError ? authError.message : 'Registration failed in Supabase Auth'
-      });
-    }
-
-    const userId = authData.user.id;
-
-    // 2. Insert user profile into the profiles table
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .insert([
-        {
-          id: userId,
-          display_name: displayName,
-          target_goal: targetGoal || null,
-          level: 1,
-          xp: 0,
-          streak: 0,
-          max_streak: 0,
-          retention_rate: 0
-        }
-      ])
-      .select()
-      .single();
-
-    if (profileError) {
-      console.error('Profile creation error:', profileError);
-      return res.status(400).json({
-        success: false,
-        message: 'Auth user created, but failed to initialize profile row.',
-        error: profileError.message,
-        userId
-      });
-    }
+    const data = await authService.register({ email, password, displayName, targetGoal, wordsPerDay });
 
     res.status(201).json({
       success: true,
       message: 'User registered successfully.',
-      data: {
-        user: authData.user,
-        profile: profileData,
-        session: authData.session
-      }
+      data
     });
   } catch (err) {
     console.error('Registration API error:', err);
-    res.status(500).json({
+    res.status(err.message.includes('failed') ? 400 : 500).json({
       success: false,
-      message: 'Internal server error during registration.'
+      message: err.message || 'Internal server error during registration.'
     });
   }
 }
@@ -91,45 +46,24 @@ async function login(req, res) {
       });
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.message
-      });
-    }
-
-    // Fetch matching profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', data.user.id)
-      .single();
+    const data = await authService.login({ email, password });
 
     res.status(200).json({
       success: true,
-      message: 'Logged in successfully.',
-      data: {
-        user: data.user,
-        session: data.session,
-        profile: profile || null
-      }
+      message: 'Login successful.',
+      data
     });
   } catch (err) {
     console.error('Login API error:', err);
-    res.status(500).json({
+    res.status(401).json({
       success: false,
-      message: 'Internal server error during login.'
+      message: err.message || 'Invalid credentials or internal server error.'
     });
   }
 }
 
 /**
- * Login with Google ID Token
+ * Google Login
  * POST /api/auth/google
  */
 async function loginWithGoogle(req, res) {
@@ -143,142 +77,52 @@ async function loginWithGoogle(req, res) {
       });
     }
 
-    const { data, error } = await supabase.auth.signInWithIdToken({
-      provider: 'google',
-      token: idToken
-    });
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.message
-      });
-    }
-
-    const userId = data.user.id;
-    const email = data.user.email || '';
-    const fallbackName = email.includes('@') ? email.split('@')[0] : 'User';
-    const displayName = data.user.user_metadata?.full_name || fallbackName;
-
-    // Fetch matching profile
-    let { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (!profile) {
-      // Create profile if doesn't exist (First time Google Login)
-      const { data: newProfile, error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: userId,
-            display_name: displayName,
-            target_goal: 'IELTS',
-            level: 1,
-            xp: 0,
-            streak: 0,
-            max_streak: 0,
-            retention_rate: 0
-          }
-        ])
-        .select()
-        .single();
-      
-      profile = newProfile;
-    }
+    const data = await authService.loginWithGoogle({ idToken });
 
     res.status(200).json({
       success: true,
-      message: 'Logged in with Google successfully.',
-      data: {
-        user: data.user,
-        session: data.session, // Contains JWT access_token
-        profile: profile || null
-      }
+      message: 'Google login successful.',
+      data
     });
   } catch (err) {
     console.error('Google Login API error:', err);
-    res.status(500).json({
+    res.status(401).json({
       success: false,
-      message: 'Internal server error during Google login.'
+      message: err.message || 'Invalid Google token or server error.'
     });
   }
 }
 
 /**
- * Get profile details
+ * Get user profile
  * GET /api/auth/profile
  */
 async function getProfile(req, res) {
   try {
     const userId = req.user.id;
-
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (error || !profile) {
-      return res.status(404).json({
-        success: false,
-        message: 'Profile not found.',
-        error: error ? error.message : 'Not found'
-      });
-    }
+    const profile = await authService.getProfile(userId);
 
     res.status(200).json({
       success: true,
-      data: {
-        ...profile,
-        email: req.user.email
-      }
+      data: profile
     });
   } catch (err) {
-    console.error('Get profile API error:', err);
-    res.status(500).json({
+    console.error('Get profile error:', err);
+    res.status(err.message === 'Profile not found.' ? 404 : 500).json({
       success: false,
-      message: 'Internal server error fetching profile.'
+      message: err.message || 'Internal server error fetching profile.'
     });
   }
 }
 
 /**
- * Update profile details
+ * Update user profile
  * PUT /api/auth/profile
  */
 async function updateProfile(req, res) {
   try {
     const userId = req.user.id;
-    const { displayName, targetGoal, level, xp, streak, maxStreak } = req.body;
-
-    // Prepare update payload dynamically
-    const updates = {};
-    if (displayName !== undefined) updates.display_name = displayName;
-    if (targetGoal !== undefined) updates.target_goal = targetGoal;
-    if (level !== undefined) updates.level = parseInt(level, 10);
-    if (xp !== undefined) updates.xp = parseInt(xp, 10);
-    if (streak !== undefined) updates.streak = parseInt(streak, 10);
-    if (maxStreak !== undefined) updates.max_streak = parseInt(maxStreak, 10);
-
-    updates.updated_at = new Date().toISOString();
-
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'Failed to update profile.',
-        error: error.message
-      });
-    }
+    const profile = await authService.updateProfile(userId, req.body);
 
     res.status(200).json({
       success: true,
@@ -287,9 +131,69 @@ async function updateProfile(req, res) {
     });
   } catch (err) {
     console.error('Update profile API error:', err);
-    res.status(500).json({
+    res.status(400).json({
       success: false,
-      message: 'Internal server error updating profile.'
+      message: err.message || 'Internal server error updating profile.'
+    });
+  }
+}
+
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required.'
+      });
+    }
+
+    await authService.forgotPassword(email);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset link sent to your email.'
+    });
+  } catch (err) {
+    console.error('Forgot password API error:', err);
+    res.status(400).json({
+      success: false,
+      message: err.message || 'Failed to request password reset.'
+    });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const { password } = req.body;
+    
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'No authorization token provided.'
+      });
+    }
+    const token = authHeader.split(' ')[1];
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password is required.'
+      });
+    }
+
+    await authService.resetPassword(token, password);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password has been reset successfully.'
+    });
+  } catch (err) {
+    console.error('Reset password API error:', err);
+    res.status(400).json({
+      success: false,
+      message: err.message || 'Failed to reset password.'
     });
   }
 }
@@ -299,5 +203,7 @@ module.exports = {
   login,
   loginWithGoogle,
   getProfile,
-  updateProfile
+  updateProfile,
+  forgotPassword,
+  resetPassword
 };

@@ -1,0 +1,22 @@
+{
+  "deck": {
+    "name": "TOEIC Basic 2",
+    "icon": "📊",
+    "tag": "Basic",
+    "target_goal": "TOEIC"
+  },
+  "cards": [
+    {"word": "Briefing", "pronunciation": "/ˈbriːfɪŋ/", "meaning": "Cuộc họp giao ban", "example": "We have a short briefing every morning."},
+    {"word": "Brochure", "pronunciation": "/ˈbrəʊʃə(r)/", "meaning": "Tài liệu quảng cáo", "example": "Please read our latest travel brochure."},
+    {"word": "Budget", "pronunciation": "/ˈbʌdʒɪt/", "meaning": "Ngân sách", "example": "The project is over budget."},
+    {"word": "Candidate", "pronunciation": "/ˈkændɪdət/", "meaning": "Ứng viên", "example": "She is the best candidate for the job."},
+    {"word": "Capital", "pronunciation": "/ˈkæpɪtl/", "meaning": "Vốn", "example": "We need to raise more capital."},
+    {"word": "CEO", "pronunciation": "/ˌsiː iː ˈəʊ/", "meaning": "Giám đốc điều hành", "example": "The CEO announced the new strategy."},
+    {"word": "Colleague", "pronunciation": "/ˈkɒliːɡ/", "meaning": "Đồng nghiệp", "example": "I'm having lunch with a colleague."},
+    {"word": "Commercial", "pronunciation": "/kəˈmɜːʃl/", "meaning": "Quảng cáo (trên TV, radio)", "example": "The commercial was very effective."},
+    {"word": "Commute", "pronunciation": "/kəˈmjuːt/", "meaning": "Đi làm", "example": "It takes me an hour to commute to work."},
+    {"word": "Compensate", "pronunciation": "/ˈkɒmpenseɪt/", "meaning": "Đền bù", "example": "The company will compensate for your loss."},
+    {"word": "Competitor", "pronunciation": "/kəmˈpetɪtə(r)/", "meaning": "Đối thủ cạnh tranh", "example": "We need to analyze our competitors."},
+    {"word": "Comply", "pronunciation": "/kəmˈplaɪ/", "meaning": "Tuân thủ", "example": "All businesses must comply with the law."}
+  ]
+}

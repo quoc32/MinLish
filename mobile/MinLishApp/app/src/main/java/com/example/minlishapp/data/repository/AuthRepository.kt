@@ -14,33 +14,8 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
 
-interface AuthApiService {
-    @POST("api/auth/login")
-    suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
-
-    @POST("api/auth/register")
-    suspend fun register(@Body request: RegisterRequest): Response<LoginResponse>
-
-    @POST("api/auth/google")
-    suspend fun loginWithGoogle(@Body request: GoogleLoginRequest): Response<LoginResponse>
-
-    @GET("api/auth/profile")
-    suspend fun getProfile(): Response<ProfileResponse>
-
-    @PUT("api/auth/profile")
-    suspend fun updateProfile(@Body request: ProfileUpdateRequest): Response<ProfileResponse>
-}
-
-class AuthInterceptor(private val context: Context) : Interceptor {
-    override fun intercept(chain: Interceptor.Chain): okhttp3.Response {
-        val requestBuilder = chain.request().newBuilder()
-        val token = TokenManager.getInstance(context).getToken()
-        if (token != null) {
-            requestBuilder.addHeader("Authorization", "Bearer $token")
-        }
-        return chain.proceed(requestBuilder.build())
-    }
-}
+import com.example.minlishapp.core.network.AuthInterceptor
+import com.example.minlishapp.data.remote.AuthApiService
 
 class AuthRepository(private val apiService: AuthApiService) {
 
@@ -53,6 +28,10 @@ class AuthRepository(private val apiService: AuthApiService) {
     suspend fun getProfile(): Response<ProfileResponse> = apiService.getProfile()
 
     suspend fun updateProfile(request: ProfileUpdateRequest): Response<ProfileResponse> = apiService.updateProfile(request)
+
+    suspend fun forgotPassword(request: ForgotPasswordRequest): Response<SimpleResponse> = apiService.forgotPassword(request)
+
+    suspend fun resetPassword(request: ResetPasswordRequest): Response<SimpleResponse> = apiService.resetPassword(request)
 
     companion object {
         private const val DEFAULT_BASE_URL = "http://10.0.2.2:3000/" // Android emulator loopback to host localhost

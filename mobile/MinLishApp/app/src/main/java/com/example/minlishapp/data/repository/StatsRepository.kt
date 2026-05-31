@@ -5,16 +5,8 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.GET
-import retrofit2.http.Header
+import com.example.minlishapp.data.remote.StatsApiService
 import com.example.minlishapp.BuildConfig
-
-interface StatsApiService {
-    @GET("api/stats/dashboard")
-    suspend fun getStatsDashboard(
-        @Header("x-user-id") userId: String
-    ): StatsDashboardResponse
-}
 
 class StatsRepository(private val apiService: StatsApiService) {
 

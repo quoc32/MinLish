@@ -6,5 +6,6 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 // Protected notifications routes
 router.get('/', authMiddleware, notifyController.getNotifications);
 router.patch('/:id/read', authMiddleware, notifyController.readNotification);
+router.post('/send-email-reminders', notifyController.sendEmailReminders);
 
 module.exports = router;

@@ -6,5 +6,6 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 // Protected learning routes
 router.get('/daily', authMiddleware, learnController.getDailyPlan);
 router.post('/review', authMiddleware, learnController.submitReview);
+router.post('/reset', authMiddleware, learnController.resetProgress);
 
 module.exports = router;

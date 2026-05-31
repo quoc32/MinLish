@@ -1,0 +1,22 @@
+{
+  "deck": {
+    "name": "IELTS Academic 1",
+    "icon": "🎓",
+    "tag": "Academic",
+    "target_goal": "IELTS"
+  },
+  "cards": [
+    {"word": "Abandon", "pronunciation": "/əˈbændən/", "meaning": "Từ bỏ, ruồng bỏ", "example": "They had to abandon the car."},
+    {"word": "Abstract", "pronunciation": "/ˈæbstrækt/", "meaning": "Trừu tượng", "example": "It's an abstract concept."},
+    {"word": "Academic", "pronunciation": "/ˌækəˈdemɪk/", "meaning": "Thuộc học thuật", "example": "She has a strong academic background."},
+    {"word": "Access", "pronunciation": "/ˈækses/", "meaning": "Truy cập, tiếp cận", "example": "Students have access to the library."},
+    {"word": "Accommodation", "pronunciation": "/əˌkɒməˈdeɪʃn/", "meaning": "Chỗ ở", "example": "We need to find suitable accommodation."},
+    {"word": "Accurate", "pronunciation": "/ˈækjərət/", "meaning": "Chính xác", "example": "The report needs to be accurate."},
+    {"word": "Achieve", "pronunciation": "/əˈtʃiːv/", "meaning": "Đạt được", "example": "He achieved his goals."},
+    {"word": "Acknowledge", "pronunciation": "/əkˈnɒlɪdʒ/", "meaning": "Công nhận, thừa nhận", "example": "She acknowledged her mistake."},
+    {"word": "Acquire", "pronunciation": "/əˈkwaɪə(r)/", "meaning": "Đạt được, thu được", "example": "He acquired a lot of knowledge."},
+    {"word": "Adapt", "pronunciation": "/əˈdæpt/", "meaning": "Thích nghi", "example": "It's hard to adapt to a new environment."},
+    {"word": "Adequate", "pronunciation": "/ˈædɪkwət/", "meaning": "Đầy đủ", "example": "The food was adequate for the trip."},
+    {"word": "Adjust", "pronunciation": "/əˈdʒʌst/", "meaning": "Điều chỉnh", "example": "You need to adjust the settings."}
+  ]
+}

@@ -18,11 +18,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.minlishapp.ui.theme.*
+import com.example.minlishapp.core.utils.translated
 import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
-fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
+fun LessonCompleteScreen(
+    onNavigate: (Screen) -> Unit,
+    xpGained: Int,
+    streak: Int,
+    accuracy: Int,
+    appLanguage: String = "Vietnamese"
+) {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -81,14 +88,14 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                 Spacer(modifier = Modifier.height(if (isSmallScreen) 12.dp else 24.dp))
 
                 Text(
-                    text = "Hoàn Thành Bài Học!",
+                    text = "Hoàn Thành Bài Học!".translated(appLanguage),
                     fontSize = if (isSmallScreen) 20.sp else 26.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
                 Text(
-                    text = "Bạn đã hoàn thành xuất sắc mục tiêu ngày hôm nay. Hãy duy trì phong độ nhé!",
+                    text = "Bạn đã hoàn thành xuất sắc mục tiêu ngày hôm nay. Hãy duy trì phong độ nhé!".translated(appLanguage),
                     fontSize = if (isSmallScreen) 12.sp else 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -105,18 +112,19 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                 RewardCard(
                     weight = 1f,
                     icon = "⚡",
-                    value = "+50 XP",
-                    label = "Kinh nghiệm",
+                    value = "+$xpGained XP",
+                    label = "Kinh nghiệm".translated(appLanguage),
                     color = ColorGood,
                     isSmallScreen = isSmallScreen
                 )
 
                 // Thẻ Streak
+                val streakValue = if (appLanguage == "English") "$streak days" else "$streak ngày"
                 RewardCard(
                     weight = 1f,
                     icon = "🔥",
-                    value = "16 ngày",
-                    label = "Chuỗi ngày",
+                    value = streakValue,
+                    label = "Chuỗi ngày".translated(appLanguage),
                     color = ColorStreakFlame,
                     isSmallScreen = isSmallScreen
                 )
@@ -125,8 +133,8 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                 RewardCard(
                     weight = 1f,
                     icon = "🎯",
-                    value = "100%",
-                    label = "Chính xác",
+                    value = "$accuracy%",
+                    label = "Chính xác".translated(appLanguage),
                     color = ColorEasy,
                     isSmallScreen = isSmallScreen
                 )
@@ -141,7 +149,7 @@ fun LessonCompleteScreen(onNavigate: (Screen) -> Unit) {
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Text(
-                    text = "Tiếp tục lộ trình",
+                    text = "Tiếp tục lộ trình".translated(appLanguage),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )

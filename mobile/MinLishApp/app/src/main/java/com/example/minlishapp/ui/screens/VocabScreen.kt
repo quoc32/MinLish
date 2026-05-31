@@ -20,6 +20,11 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,20 +39,32 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.minlishapp.data.Deck
 import com.example.minlishapp.data.UserProgress
+import com.example.minlishapp.core.utils.LanguageHelper
+import com.example.minlishapp.core.utils.translated
+import com.google.gson.Gson
+
 
 @Composable
 fun VocabScreen(
-    decks: List<Deck>,
-    onAddDeck: (Deck) -> Unit,
+    vocabViewModel: com.example.minlishapp.ui.viewmodel.VocabViewModel,
     onNavigate: (Screen) -> Unit,
     userProgress: UserProgress,
     activeDeck: Deck?,
     onActiveDeckSelect: (Deck) -> Unit,
-    onAddWordToDeck: (String, com.example.minlishapp.data.Word) -> Unit
+    onStartStudy: (Deck) -> Unit = {}
 ) {
+    val decks by vocabViewModel.decks.collectAsState()
+    val isLoadingDecks by vocabViewModel.isLoading.collectAsState()
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        vocabViewModel.fetchDecks()
+    }
+
     var showDialog by remember { mutableStateOf(false) }
     var newDeckName by remember { mutableStateOf("") }
     var newDeckDesc by remember { mutableStateOf("") }
@@ -59,11 +76,73 @@ fun VocabScreen(
     // States for adding vocabulary word
     var showAddWordDialog by remember { mutableStateOf(false) }
     var selectedDeckForAddingWord by remember { mutableStateOf<Deck?>(null) }
+    
+    // States for managing cards
+    var showManageCardsDialog by remember { mutableStateOf(false) }
+    var selectedDeckForManaging by remember { mutableStateOf<Deck?>(null) }
+    var managingCardsList by remember { mutableStateOf<List<com.example.minlishapp.data.Word>>(emptyList()) }
+    var isLoadingCards by remember { mutableStateOf(false) }
 
     // States for Import/Export
-    var showImportDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
-    var selectedImportFile by remember { mutableStateOf<String?>(null) }
+    var deckToExport by remember { mutableStateOf<Deck?>(null) }
+    
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let { destUri ->
+            deckToExport?.let { deck ->
+                vocabViewModel.exportDeck(deck.id) { success, exportJson ->
+                    if (success && exportJson != null) {
+                        try {
+                            context.contentResolver.openOutputStream(destUri)?.use { out ->
+                                out.write(Gson().toJson(exportJson).toByteArray(Charsets.UTF_8))
+                            }
+                            Toast.makeText(context, "Xuất JSON thành công", Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Lỗi ghi file", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        Toast.makeText(context, "Lỗi xuất dữ liệu", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    val csvExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        uri?.let { destUri ->
+            deckToExport?.let { deck ->
+                vocabViewModel.exportDeckCsv(deck.id) { success, csvString ->
+                    if (success && csvString != null) {
+                        try {
+                            context.contentResolver.openOutputStream(destUri)?.use { out ->
+                                // Write UTF-8 BOM so Excel opens it correctly
+                                val bom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
+                                out.write(bom)
+                                out.write(csvString.toByteArray(Charsets.UTF_8))
+                            }
+                            Toast.makeText(context, "Xuất CSV thành công", Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Lỗi ghi file", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        Toast.makeText(context, "Lỗi xuất dữ liệu", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { sourceUri ->
+            vocabViewModel.importDeck(sourceUri) { success, msg ->
+                if (success) {
+                    Toast.makeText(context, "Nhập thành công", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Lỗi: $msg", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     
     var newWordText by remember { mutableStateOf("") }
     var newWordPron by remember { mutableStateOf("") }
@@ -73,27 +152,31 @@ fun VocabScreen(
     var newWordExampleTrans by remember { mutableStateOf("") }
     var newWordCollocations by remember { mutableStateOf("") }
     var newWordSynonyms by remember { mutableStateOf("") }
+    var newWordRelated by remember { mutableStateOf("") }
+    var newWordNote by remember { mutableStateOf("") }
     var newWordType by remember { mutableStateOf("noun") }
 
-    val filteredDecks = decks.filter {
-        it.name.contains(searchQuery, ignoreCase = true) || it.description.contains(searchQuery, ignoreCase = true)
-    }.filter {
-        when (selectedFilter) {
-            "In Progress" -> it.progress > 0f && it.progress < 1f
-            "Mastered" -> it.progress >= 1f
-            else -> true
+    val filteredDecks = remember(decks, searchQuery, selectedFilter) {
+        decks.filter {
+            it.name.contains(searchQuery, ignoreCase = true) || it.description.contains(searchQuery, ignoreCase = true)
+        }.filter {
+            when (selectedFilter) {
+                "In Progress" -> it.progress > 0f && it.progress < 1f
+                "Mastered" -> it.progress >= 1f
+                else -> true
+            }
         }
     }
 
     Scaffold(
-        bottomBar = { AppBottomBar(currentScreen = Screen.VocabDecks, onNavigate = onNavigate) },
+        bottomBar = { AppBottomBar(currentScreen = Screen.VocabDecks, onNavigate = onNavigate, appLanguage = userProgress.appLanguage) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showDialog = true },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Thêm bộ từ")
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Thêm bộ từ".translated(userProgress.appLanguage))
             }
         }
     ) { innerPadding ->
@@ -112,7 +195,7 @@ fun VocabScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Bộ Từ Vựng theo Lộ trình",
+                    text = "Bộ từ vựng".translated(userProgress.appLanguage),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -120,7 +203,7 @@ fun VocabScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { showImportDialog = true }) {
+                    IconButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/csv", "text/comma-separated-values", "*/*")) }) {
                         Icon(
                             imageVector = Icons.Default.Upload,
                             contentDescription = "Import",
@@ -141,7 +224,7 @@ fun VocabScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Tìm kiếm chủ đề từ vựng...") },
+                placeholder = { Text("Tìm kiếm bộ từ...".translated(userProgress.appLanguage)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -181,7 +264,7 @@ fun VocabScreen(
                             .padding(horizontal = 14.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = label,
+                            text = label.translated(userProgress.appLanguage),
                             color = if (isSel) MaterialTheme.colorScheme.onPrimary
                             else MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
@@ -194,13 +277,20 @@ fun VocabScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // List of Decks - Staggered connected roadmap layout
-            if (filteredDecks.isEmpty()) {
+            if (isLoadingDecks && decks.isEmpty()) {
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else if (filteredDecks.isEmpty()) {
                 Box(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Không tìm thấy bộ từ vựng nào.",
+                        text = if (searchQuery.isEmpty()) "Không tìm thấy bộ từ vựng nào.".translated(userProgress.appLanguage) else "Không tìm thấy kết quả cho".translated(userProgress.appLanguage) + " \"$searchQuery\"",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -241,20 +331,140 @@ fun VocabScreen(
                                     modifier = Modifier.padding(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    // Tag
-                                    val tagText = deck.tags.firstOrNull() ?: "CHỦ ĐỀ"
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(100.dp))
-                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    var expandedMenu by remember { mutableStateOf(false) }
+                                    var showEditDialog by remember { mutableStateOf(false) }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = tagText,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                        // Tag
+                                        val tagText = deck.tags.firstOrNull() ?: "CHỦ ĐỀ"
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(100.dp))
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = tagText,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+
+                                        Box {
+                                            IconButton(onClick = { expandedMenu = true }) {
+                                                Icon(imageVector = Icons.Default.MoreVert, contentDescription = "Tùy chọn".translated(userProgress.appLanguage))
+                                            }
+                                            DropdownMenu(
+                                                expanded = expandedMenu,
+                                                onDismissRequest = { expandedMenu = false }
+                                            ) {
+                                                DropdownMenuItem(
+                                                    text = { Text("Quản lý từ vựng".translated(userProgress.appLanguage)) },
+                                                    onClick = {
+                                                        expandedMenu = false
+                                                        selectedDeckForManaging = deck
+                                                        isLoadingCards = true
+                                                        showManageCardsDialog = true
+                                                        vocabViewModel.fetchDeckCards(deck.id) { words ->
+                                                            managingCardsList = words
+                                                            isLoadingCards = false
+                                                        }
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Sửa thông tin".translated(userProgress.appLanguage)) },
+                                                    onClick = { 
+                                                        expandedMenu = false
+                                                        showEditDialog = true
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Xóa bộ từ".translated(userProgress.appLanguage)) },
+                                                    onClick = { 
+                                                        expandedMenu = false
+                                                        vocabViewModel.deleteDeck(deck.id) { success, msg ->
+                                                            if (success) {
+                                                                Toast.makeText(context, "Đã xóa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                            } else {
+                                                                Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        }
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    if (showEditDialog) {
+                                        var editDeckName by remember { mutableStateOf(deck.name) }
+                                        var editDeckDesc by remember { mutableStateOf(deck.description) }
+                                        var editDeckTags by remember { mutableStateOf(deck.tags.joinToString(", ")) }
+
+                                        Dialog(onDismissRequest = { showEditDialog = false }) {
+                                            Card(
+                                                shape = RoundedCornerShape(20.dp),
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.surface
+                                                ),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(16.dp)
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(20.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                                ) {
+                                                    Text("Sửa Bộ Từ Vựng".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold, fontSize = 18.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+
+                                                    OutlinedTextField(
+                                                        value = editDeckName,
+                                                        onValueChange = { editDeckName = it },
+                                                        label = { Text("Tên bộ từ".translated(userProgress.appLanguage)) },
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+
+                                                    OutlinedTextField(
+                                                        value = editDeckDesc,
+                                                        onValueChange = { editDeckDesc = it },
+                                                        label = { Text("Mô tả".translated(userProgress.appLanguage)) },
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+
+                                                    OutlinedTextField(
+                                                        value = editDeckTags,
+                                                        onValueChange = { editDeckTags = it },
+                                                        label = { Text("Nhãn / Tags".translated(userProgress.appLanguage)) },
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                        OutlinedButton(onClick = { showEditDialog = false }, modifier = Modifier.weight(1f)) {
+                                                            Text("Hủy".translated(userProgress.appLanguage))
+                                                        }
+                                                        Button(
+                                                            onClick = {
+                                                                vocabViewModel.updateDeck(deck.id, editDeckName, editDeckTags.split(",").firstOrNull()?.trim()) { success, msg ->
+                                                                    if (success) {
+                                                                        showEditDialog = false
+                                                                        Toast.makeText(context, "Đã sửa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                                    } else {
+                                                                        Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                                                    }
+                                                                }
+                                                            },
+                                                            modifier = Modifier.weight(1f)
+                                                        ) {
+                                                            Text("Lưu".translated(userProgress.appLanguage))
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
 
                                     // Title
@@ -267,7 +477,7 @@ fun VocabScreen(
 
                                     // Subtitle
                                     Text(
-                                        text = "${deck.words.size} từ vựng",
+                                        text = "${deck.wordCount} " + "từ".translated(userProgress.appLanguage),
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -292,7 +502,7 @@ fun VocabScreen(
                                             modifier = Modifier.weight(1f).height(44.dp)
                                         ) {
                                             Text(
-                                                text = "+ Từ mới",
+                                                text = "+ Từ mới".translated(userProgress.appLanguage),
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp
                                             )
@@ -302,8 +512,7 @@ fun VocabScreen(
                                         val buttonColor = Color(0xFF10B981)
                                         OutlinedButton(
                                             onClick = {
-                                                onActiveDeckSelect(deck)
-                                                onNavigate(Screen.Flashcards)
+                                                onStartStudy(deck)
                                             },
                                             shape = RoundedCornerShape(12.dp),
                                             border = BorderStroke(1.dp, buttonColor),
@@ -323,7 +532,7 @@ fun VocabScreen(
                                                 )
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text(
-                                                    text = "Vào học",
+                                                    text = "Vào học".translated(userProgress.appLanguage),
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 13.sp
                                                 )
@@ -386,7 +595,7 @@ fun VocabScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = "Tạo Bộ Từ Vựng Mới",
+                            text = "Tạo Bộ Từ Vựng Mới".translated(userProgress.appLanguage),
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             textAlign = TextAlign.Center,
@@ -396,7 +605,7 @@ fun VocabScreen(
                         OutlinedTextField(
                             value = newDeckName,
                             onValueChange = { newDeckName = it },
-                            label = { Text("Tên bộ từ") },
+                            label = { Text("Tên bộ từ".translated(userProgress.appLanguage)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -404,7 +613,7 @@ fun VocabScreen(
                         OutlinedTextField(
                             value = newDeckDesc,
                             onValueChange = { newDeckDesc = it },
-                            label = { Text("Mô tả") },
+                            label = { Text("Mô tả".translated(userProgress.appLanguage)) },
                             modifier = Modifier.fillMaxWidth(),
                             minLines = 2
                         )
@@ -412,8 +621,8 @@ fun VocabScreen(
                         OutlinedTextField(
                             value = newDeckTags,
                             onValueChange = { newDeckTags = it },
-                            label = { Text("Nhãn / Tags (Phân cách bằng dấu phẩy)") },
-                            placeholder = { Text("Ví dụ: IELTS, Giao tiếp") },
+                            label = { Text("Nhãn / Tags (Phân cách bằng dấu phẩy)".translated(userProgress.appLanguage)) },
+                            placeholder = { Text("Ví dụ: IELTS, Giao tiếp".translated(userProgress.appLanguage)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -427,31 +636,29 @@ fun VocabScreen(
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Hủy")
+                                Text("Hủy".translated(userProgress.appLanguage))
                             }
 
                             Button(
                                 onClick = {
                                     if (newDeckName.isNotBlank()) {
-                                        onAddDeck(
-                                            Deck(
-                                                id = System.currentTimeMillis().toString(),
-                                                name = newDeckName,
-                                                description = newDeckDesc,
-                                                tags = newDeckTags.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                                                words = emptyList()
-                                            )
-                                        )
-                                        newDeckName = ""
-                                        newDeckDesc = ""
-                                        newDeckTags = "Cá nhân"
-                                        showDialog = false
+                                        vocabViewModel.createDeck(newDeckName, newDeckTags.split(",").firstOrNull()?.trim()) { success, msg ->
+                                            if (success) {
+                                                Toast.makeText(context, "Thêm bộ từ thành công".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                newDeckName = ""
+                                                newDeckDesc = ""
+                                                newDeckTags = "Cá nhân"
+                                                showDialog = false
+                                            } else {
+                                                Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                     }
                                 },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Lưu")
+                                Text("Lưu".translated(userProgress.appLanguage))
                             }
                         }
                     }
@@ -475,123 +682,162 @@ fun VocabScreen(
                     Column(
                         modifier = Modifier
                             .padding(20.dp)
-                            .heightIn(max = 480.dp)
-                            .verticalScroll(rememberScrollState()),
+                            .fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Text(
-                            text = "Thêm Từ Vựng Vào Bộ",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            text = "Bộ từ: ${selectedDeckForAddingWord?.name}",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        // 1. Từ vựng
-                        OutlinedTextField(
-                            value = newWordText,
-                            onValueChange = { newWordText = it },
-                            label = { Text("Từ tiếng Anh (*)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        // 2. Loại từ (adjective, noun, verb...)
-                        Text(text = "Loại từ:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Row(
+                        // Sticky Header
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            listOf("verb" to "Động từ", "noun" to "Danh từ", "adjective" to "Tính từ", "adverb" to "Trạng từ").forEach { (typeKey, label) ->
-                                val isSel = newWordType == typeKey
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(
-                                            if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                        )
-                                        .border(
-                                            1.dp,
-                                            if (isSel) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable { newWordType = typeKey }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSel) MaterialTheme.colorScheme.primary else Color.Gray
-                                    )
-                                }
-                            }
+                            Text(
+                                text = "Thêm Từ Vựng Vào Bộ".translated(userProgress.appLanguage),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                text = "Bộ từ:".translated(userProgress.appLanguage) + " ${selectedDeckForAddingWord?.name}",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
 
-                        // 3. Phiên âm
-                        OutlinedTextField(
-                            value = newWordPron,
-                            onValueChange = { newWordPron = it },
-                            label = { Text("Phiên âm UK (*)") },
-                            placeholder = { Text("Ví dụ: /ə'kɒmədeɪt/") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        // Scrollable Body Content
+                        Column(
+                            modifier = Modifier
+                                .weight(weight = 1f, fill = false)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            // 1. Từ vựng
+                            OutlinedTextField(
+                                value = newWordText,
+                                onValueChange = { newWordText = it },
+                                label = { Text("Từ tiếng Anh (*)".translated(userProgress.appLanguage)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                        // 4. Nghĩa tiếng Việt
-                        OutlinedTextField(
-                            value = newWordMeaning,
-                            onValueChange = { newWordMeaning = it },
-                            label = { Text("Nghĩa tiếng Việt (*)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            // 2. Loại từ (adjective, noun, verb...)
+                            Text(text = "Loại từ:".translated(userProgress.appLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf("verb" to "Động từ", "noun" to "Danh từ", "adjective" to "Tính từ", "adverb" to "Trạng từ").forEach { (typeKey, label) ->
+                                    val isSel = newWordType == typeKey
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(
+                                                if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (isSel) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable { newWordType = typeKey }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label.translated(userProgress.appLanguage),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSel) MaterialTheme.colorScheme.primary else Color.Gray
+                                        )
+                                    }
+                                }
+                            }
 
-                        // 5. Câu ví dụ tiếng Anh
-                        OutlinedTextField(
-                            value = newWordExample,
-                            onValueChange = { newWordExample = it },
-                            label = { Text("Câu ví dụ tiếng Anh") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            // 3. Phiên âm
+                            OutlinedTextField(
+                                value = newWordPron,
+                                onValueChange = { newWordPron = it },
+                                label = { Text("Phiên âm UK (*)".translated(userProgress.appLanguage)) },
+                                placeholder = { Text("Ví dụ: /ə'kɒmədeɪt/".translated(userProgress.appLanguage)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                        // 6. Dịch nghĩa câu ví dụ
-                        OutlinedTextField(
-                            value = newWordExampleTrans,
-                            onValueChange = { newWordExampleTrans = it },
-                            label = { Text("Dịch nghĩa câu ví dụ") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            // 4. Nghĩa tiếng Việt
+                            OutlinedTextField(
+                                value = newWordMeaning,
+                                onValueChange = { newWordMeaning = it },
+                                label = { Text("Nghĩa tiếng Việt (*)".translated(userProgress.appLanguage)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                        // 7. Collocations
-                        OutlinedTextField(
-                            value = newWordCollocations,
-                            onValueChange = { newWordCollocations = it },
-                            label = { Text("Collocations (Phân cách bằng dấu phẩy)") },
-                            placeholder = { Text("Ví dụ: accommodate guests, accommodate needs") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            // 4b. Định nghĩa tiếng Anh
+                            OutlinedTextField(
+                                value = newWordDesc,
+                                onValueChange = { newWordDesc = it },
+                                label = { Text("Định nghĩa tiếng Anh (Description)".translated(userProgress.appLanguage)) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                        // 8. Từ đồng nghĩa
-                        OutlinedTextField(
-                            value = newWordSynonyms,
-                            onValueChange = { newWordSynonyms = it },
-                            label = { Text("Từ đồng nghĩa (Phân cách bằng dấu phẩy)") },
-                            placeholder = { Text("Ví dụ: hold, contain") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                            // 5. Câu ví dụ tiếng Anh
+                            OutlinedTextField(
+                                value = newWordExample,
+                                onValueChange = { newWordExample = it },
+                                label = { Text("Câu ví dụ tiếng Anh".translated(userProgress.appLanguage)) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
 
-                        // Buttons
+                            // 6. Dịch nghĩa câu ví dụ
+                            OutlinedTextField(
+                                value = newWordExampleTrans,
+                                onValueChange = { newWordExampleTrans = it },
+                                label = { Text("Dịch nghĩa câu ví dụ".translated(userProgress.appLanguage)) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // 7. Collocations
+                            OutlinedTextField(
+                                value = newWordCollocations,
+                                onValueChange = { newWordCollocations = it },
+                                label = { Text("Collocations (Phân cách bằng dấu phẩy)".translated(userProgress.appLanguage)) },
+                                placeholder = { Text("Ví dụ: accommodate guests, accommodate needs".translated(userProgress.appLanguage)) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // 8. Từ đồng nghĩa
+                            OutlinedTextField(
+                                value = newWordSynonyms,
+                                onValueChange = { newWordSynonyms = it },
+                                label = { Text("Từ đồng nghĩa (Phân cách bằng dấu phẩy)".translated(userProgress.appLanguage)) },
+                                placeholder = { Text("Ví dụ: hold, contain".translated(userProgress.appLanguage)) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // 8b. Từ liên quan (Related words)
+                            OutlinedTextField(
+                                value = newWordRelated,
+                                onValueChange = { newWordRelated = it },
+                                label = { Text("Từ liên quan (Phân cách bằng dấu phẩy)".translated(userProgress.appLanguage)) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // 8c. Ghi chú (Note)
+                            OutlinedTextField(
+                                value = newWordNote,
+                                onValueChange = { newWordNote = it },
+                                label = { Text("Ghi chú (Note)".translated(userProgress.appLanguage)) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        // Sticky Footer Buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -601,7 +847,7 @@ fun VocabScreen(
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Hủy")
+                                Text("Hủy".translated(userProgress.appLanguage))
                             }
 
                             Button(
@@ -611,34 +857,43 @@ fun VocabScreen(
                                             word = newWordText.trim(),
                                             pronunciation = newWordPron.trim(),
                                             meaning = newWordMeaning.trim(),
+                                            description = newWordDesc.trim(),
                                             example = newWordExample.trim(),
                                             exampleTranslation = newWordExampleTrans.trim(),
                                             wordType = newWordType,
                                             collocations = newWordCollocations.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                                            synonyms = newWordSynonyms.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                            synonyms = newWordSynonyms.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                                            relatedWords = newWordRelated.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                                            note = newWordNote.trim()
                                         )
                                         
-                                        onAddWordToDeck(selectedDeckForAddingWord!!.id, newWord)
-                                        
-                                        // Reset fields
-                                        newWordText = ""
-                                        newWordPron = ""
-                                        newWordMeaning = ""
-                                        newWordExample = ""
-                                        newWordExampleTrans = ""
-                                        newWordCollocations = ""
-                                        newWordSynonyms = ""
-                                        newWordType = "noun"
-                                        
-                                        showAddWordDialog = false
+                                        vocabViewModel.createCard(selectedDeckForAddingWord!!.id, newWord) { success, msg ->
+                                            if (success) {
+                                                Toast.makeText(context, "Thêm từ thành công".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                newWordText = ""
+                                                newWordPron = ""
+                                                newWordMeaning = ""
+                                                newWordDesc = ""
+                                                newWordExample = ""
+                                                newWordExampleTrans = ""
+                                                newWordCollocations = ""
+                                                newWordSynonyms = ""
+                                                newWordRelated = ""
+                                                newWordNote = ""
+                                                newWordType = "noun"
+                                                showAddWordDialog = false
+                                            } else {
+                                                Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
                                     } else {
-                                        Toast.makeText(context, "Vui lòng điền đủ các trường bắt buộc (*)", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Vui lòng điền đủ các trường bắt buộc (*)".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Lưu")
+                                Text("Lưu".translated(userProgress.appLanguage))
                             }
                         }
                     }
@@ -646,12 +901,242 @@ fun VocabScreen(
             }
         }
 
-        // Import Dialog
-        if (showImportDialog) {
-            Dialog(onDismissRequest = { 
-                showImportDialog = false
-                selectedImportFile = null
-            }) {
+        // Manage Cards Dialog
+        if (showManageCardsDialog && selectedDeckForManaging != null) {
+            Dialog(
+                onDismissRequest = { showManageCardsDialog = false },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Top Bar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(onClick = { showManageCardsDialog = false }) {
+                                Icon(Icons.Default.Close, contentDescription = "Đóng".translated(userProgress.appLanguage))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Quản lý từ vựng".translated(userProgress.appLanguage) + " - ${selectedDeckForManaging?.name}",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        if (isLoadingCards) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        } else if (managingCardsList.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("Bộ từ này chưa có từ vựng nào.".translated(userProgress.appLanguage))
+                            }
+                        } else {
+                            var editingCard by remember { mutableStateOf<com.example.minlishapp.data.Word?>(null) }
+                            
+                            if (editingCard != null) {
+                                // Edit Form
+                                Column(
+                                    modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text("Sửa từ vựng".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                    var editWord by remember { mutableStateOf(editingCard!!.word) }
+                                    var editPronunciation by remember { mutableStateOf(editingCard!!.pronunciation) }
+                                    var editMeaning by remember { mutableStateOf(editingCard!!.meaning) }
+                                    var editDescription by remember { mutableStateOf(editingCard!!.description) }
+                                    var editExample by remember { mutableStateOf(editingCard!!.example) }
+                                    var editExampleTrans by remember { mutableStateOf(editingCard!!.exampleTranslation) }
+                                    var editWordType by remember { mutableStateOf(editingCard!!.wordType) }
+                                    var editCollocations by remember { mutableStateOf(editingCard!!.collocations.joinToString(", ")) }
+                                    var editSynonyms by remember { mutableStateOf(editingCard!!.synonyms.joinToString(", ")) }
+                                    var editRelatedWords by remember { mutableStateOf(editingCard!!.relatedWords.joinToString(", ")) }
+                                    var editNote by remember { mutableStateOf(editingCard!!.note) }
+
+                                    OutlinedTextField(
+                                        value = editWord, onValueChange = { editWord = it },
+                                        label = { Text("Từ vựng *".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    // Loại từ (adjective, noun, verb...)
+                                    Text(text = "Loại từ:".translated(userProgress.appLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        listOf("verb" to "Động từ", "noun" to "Danh từ", "adjective" to "Tính từ", "adverb" to "Trạng từ").forEach { (typeKey, label) ->
+                                            val isSel = editWordType == typeKey
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(
+                                                        if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                    )
+                                                    .border(
+                                                        1.dp,
+                                                        if (isSel) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .clickable { editWordType = typeKey }
+                                                    .padding(vertical = 8.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = label.translated(userProgress.appLanguage),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isSel) MaterialTheme.colorScheme.primary else Color.Gray
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    OutlinedTextField(
+                                        value = editPronunciation, onValueChange = { editPronunciation = it },
+                                        label = { Text("Phiên âm".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = editMeaning, onValueChange = { editMeaning = it },
+                                        label = { Text("Nghĩa tiếng Việt *".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = editDescription, onValueChange = { editDescription = it },
+                                        label = { Text("Nghĩa tiếng Anh (Description)".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = editExample, onValueChange = { editExample = it },
+                                        label = { Text("Ví dụ".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = editExampleTrans, onValueChange = { editExampleTrans = it },
+                                        label = { Text("Dịch nghĩa câu ví dụ".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = editCollocations, onValueChange = { editCollocations = it },
+                                        label = { Text("Collocations (Phân cách bằng dấu phẩy)".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = editSynonyms, onValueChange = { editSynonyms = it },
+                                        label = { Text("Từ đồng nghĩa (Phân cách bằng dấu phẩy)".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = editRelatedWords, onValueChange = { editRelatedWords = it },
+                                        label = { Text("Từ liên quan (Phân cách bằng dấu phẩy)".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = editNote, onValueChange = { editNote = it },
+                                        label = { Text("Ghi chú (Note)".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                        OutlinedButton(onClick = { editingCard = null }, modifier = Modifier.weight(1f)) {
+                                            Text("Hủy".translated(userProgress.appLanguage))
+                                        }
+                                        Button(
+                                            onClick = {
+                                                if (editWord.isNotBlank() && editMeaning.isNotBlank()) {
+                                                    val updatedWord = editingCard!!.copy(
+                                                        word = editWord.trim(),
+                                                        pronunciation = editPronunciation.trim(),
+                                                        meaning = editMeaning.trim(),
+                                                        description = editDescription.trim(),
+                                                        example = editExample.trim(),
+                                                        exampleTranslation = editExampleTrans.trim(),
+                                                        wordType = editWordType,
+                                                        collocations = editCollocations.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                                                        synonyms = editSynonyms.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                                                        relatedWords = editRelatedWords.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                                                        note = editNote.trim()
+                                                    )
+                                                    vocabViewModel.updateCard(
+                                                        cardId = updatedWord.id,
+                                                        deckId = selectedDeckForManaging!!.id,
+                                                        word = updatedWord
+                                                    ) { success, msg ->
+                                                        if (success) {
+                                                            Toast.makeText(context, "Cập nhật thành công".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                            editingCard = null
+                                                            isLoadingCards = true
+                                                            vocabViewModel.fetchDeckCards(selectedDeckForManaging!!.id) { words ->
+                                                                managingCardsList = words
+                                                                isLoadingCards = false
+                                                            }
+                                                        } else {
+                                                            Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                } else {
+                                                    Toast.makeText(context, "Vui lòng nhập đủ các trường bắt buộc".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Lưu".translated(userProgress.appLanguage))
+                                        }
+                                    }
+                                }
+                            } else {
+                                // List of Cards
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(managingCardsList) { card ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(card.word, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                    if (card.pronunciation.isNotBlank()) {
+                                                        Text(card.pronunciation, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    }
+                                                    Text(card.meaning, fontSize = 14.sp)
+                                                }
+                                                IconButton(onClick = { editingCard = card }) {
+                                                    Icon(Icons.Default.Edit, contentDescription = "Sửa".translated(userProgress.appLanguage), tint = MaterialTheme.colorScheme.primary)
+                                                }
+                                                IconButton(onClick = {
+                                                    vocabViewModel.deleteCard(card.id) { success, msg ->
+                                                        if (success) {
+                                                            Toast.makeText(context, "Đã xóa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                            managingCardsList = managingCardsList.filter { it.id != card.id }
+                                                        } else {
+                                                            Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                }) {
+                                                    Icon(Icons.Default.Delete, contentDescription = "Xóa".translated(userProgress.appLanguage), tint = MaterialTheme.colorScheme.error)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Export Dialog
+        if (showExportDialog) {
+            Dialog(onDismissRequest = { showExportDialog = false }) {
                 Card(
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
@@ -670,286 +1155,80 @@ fun VocabScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = "Nhập Từ Vựng (Giả Lập)",
+                            text = "Chọn Bộ Từ Xuất Ra".translated(userProgress.appLanguage),
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        if (selectedImportFile == null) {
-                            Text(
-                                text = "Chọn file dữ liệu để bắt đầu nhập từ vựng:",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        // Format selection
+                        var exportFormat by remember { mutableStateOf("json") }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = exportFormat == "json",
+                                onClick = { exportFormat = "json" },
+                                label = { Text("JSON") },
+                                modifier = Modifier.weight(1f)
                             )
-
-                            val files = listOf(
-                                "toeic_conferences_vocab.csv" to "Hội nghị & Sự kiện (3 từ)",
-                                "ielts_academic_essentials.csv" to "Học thuật Cốt lõi (2 từ)",
-                                "travel_survival_kit.xlsx" to "Du lịch Cơ bản (2 từ)"
+                            FilterChip(
+                                selected = exportFormat == "csv",
+                                onClick = { exportFormat = "csv" },
+                                label = { Text("CSV") },
+                                modifier = Modifier.weight(1f)
                             )
+                        }
 
-                            files.forEach { (filename, desc) ->
-                                Card(
-                                    onClick = { selectedImportFile = filename },
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
+                        decks.forEach { deck ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    deckToExport = deck
+                                    showExportDialog = false
+                                    if (exportFormat == "csv") {
+                                        csvExportLauncher.launch("${deck.name}.csv")
+                                    } else {
+                                        exportLauncher.launch("${deck.name}.json")
+                                    }
+                                },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = "📄", fontSize = 20.sp)
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Column {
-                                            Text(
-                                                text = filename,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp
-                                            )
-                                            Text(
-                                                text = desc,
-                                                fontSize = 12.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
+                                    Text(text = "📚", fontSize = 20.sp)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = deck.name,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                        Text(
+                                            text = "${deck.wordCount} " + "từ".translated(userProgress.appLanguage),
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
                             }
-                        } else {
-                            Text(
-                                text = "Chọn bộ từ muốn nạp từ từ file:\n\"${selectedImportFile}\"",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
+                        }
 
-                            decks.forEach { deck ->
-                                Card(
-                                    onClick = {
-                                        val wordsToImport = when (selectedImportFile) {
-                                            "toeic_conferences_vocab.csv" -> listOf(
-                                                com.example.minlishapp.data.Word(
-                                                    word = "reception",
-                                                    wordType = "noun",
-                                                    pronunciation = "/rɪˈsep.ʃən/",
-                                                    meaning = "tiệc chiêu đãi, sự đón nhận",
-                                                    example = "\"A welcome reception will be held on the first evening.\"",
-                                                    exampleTranslation = "(Một bữa tiệc chiêu đãi chào mừng sẽ được tổ chức vào tối đầu tiên.)",
-                                                    collocations = listOf("wedding reception: tiệc cưới", "warm reception: sự đón tiếp nồng hậu"),
-                                                    synonyms = listOf("welcome", "gathering")
-                                                ),
-                                                com.example.minlishapp.data.Word(
-                                                    word = "negotiate",
-                                                    wordType = "verb",
-                                                    pronunciation = "/nəˈɡəʊ.ʃi.eɪt/",
-                                                    meaning = "đàm phán, thương lượng",
-                                                    example = "\"They managed to negotiate a friendly settlement.\"",
-                                                    exampleTranslation = "(Họ đã cố gắng thương lượng một thỏa thuận thân thiện.)",
-                                                    collocations = listOf("negotiate a deal: đàm phán hợp đồng", "negotiate terms: đàm phán điều khoản"),
-                                                    synonyms = listOf("discuss", "bargain")
-                                                 ),
-                                                 com.example.minlishapp.data.Word(
-                                                     word = "executive",
-                                                     wordType = "noun",
-                                                     pronunciation = "/ɪɡˈzek.jə.tɪv/",
-                                                     meaning = "giám đốc điều hành",
-                                                     example = "\"The executive committee will meet tomorrow morning.\"",
-                                                     exampleTranslation = "(Ban điều hành sẽ họp vào sáng mai.)",
-                                                     collocations = listOf("chief executive: giám đốc điều hành"),
-                                                     synonyms = listOf("manager", "director")
-                                                 )
-                                             )
-                                             "ielts_academic_essentials.csv" -> listOf(
-                                                 com.example.minlishapp.data.Word(
-                                                     word = "advocate",
-                                                     wordType = "verb",
-                                                     pronunciation = "/ˈæd.və.keɪt/",
-                                                     meaning = "tán thành, ủng hộ, biện hộ",
-                                                     example = "\"Some politicians advocate reforming the educational system.\"",
-                                                     exampleTranslation = "(Một số chính trị gia ủng hộ việc cải cách hệ thống giáo dục.)",
-                                                     collocations = listOf("strongly advocate: mạnh mẽ ủng hộ"),
-                                                     synonyms = listOf("support", "champion")
-                                                 ),
-                                                 com.example.minlishapp.data.Word(
-                                                     word = "mitigate",
-                                                     wordType = "verb",
-                                                     pronunciation = "/ˈmɪt.ɪ.ɡeɪt/",
-                                                     meaning = "giảm thiểu, làm dịu bớt",
-                                                     example = "\"Soil erosion was mitigated by the planting of trees.\"",
-                                                     exampleTranslation = "(Sự xói mòn đất đã được giảm thiểu bằng việc trồng cây.)",
-                                                     collocations = listOf("mitigate risk: giảm thiểu rủi ro"),
-                                                     synonyms = listOf("alleviate", "reduce")
-                                                 )
-                                             )
-                                             else -> listOf(
-                                                 com.example.minlishapp.data.Word(
-                                                     word = "souvenir",
-                                                     wordType = "noun",
-                                                     pronunciation = "/ˌsuː.vənˈɪər/",
-                                                     meaning = "quà lưu niệm",
-                                                     example = "\"I bought a model of the Eiffel Tower as a souvenir.\"",
-                                                     exampleTranslation = "(Tôi mua một mô hình tháp Eiffel làm quà lưu niệm.)",
-                                                     collocations = listOf("souvenir shop: cửa hàng quà lưu niệm"),
-                                                     synonyms = listOf("keepsake", "memento")
-                                                 ),
-                                                 com.example.minlishapp.data.Word(
-                                                     word = "embark",
-                                                     wordType = "verb",
-                                                     pronunciation = "/ɪmˈbɑːk/",
-                                                     meaning = "lên tàu, bắt đầu hành trình",
-                                                     example = "\"The passengers were waiting to embark on the cruise ship.\"",
-                                                     exampleTranslation = "(Các hành khách đang chờ để lên tàu du lịch.)",
-                                                     collocations = listOf("embark on a journey: bắt đầu hành trình"),
-                                                     synonyms = listOf("start", "board")
-                                                 )
-                                             )
-                                         }
-
-                                         wordsToImport.forEach { word ->
-                                             onAddWordToDeck(deck.id, word)
-                                         }
-
-                                         Toast.makeText(
-                                             context,
-                                             "Đã nạp ${wordsToImport.size} từ vào bộ \"${deck.name}\" thành công!",
-                                             Toast.LENGTH_SHORT
-                                         ).show()
-
-                                         showImportDialog = false
-                                         selectedImportFile = null
-                                     },
-                                     colors = CardDefaults.cardColors(
-                                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                     ),
-                                     modifier = Modifier.fillMaxWidth()
-                                 ) {
-                                     Text(
-                                         text = deck.name,
-                                         fontWeight = FontWeight.Bold,
-                                         fontSize = 14.sp,
-                                         modifier = Modifier.padding(14.dp)
-                                     )
-                                 }
-                             }
-                         }
-
-                         Row(
-                             modifier = Modifier.fillMaxWidth(),
-                             horizontalArrangement = Arrangement.spacedBy(12.dp)
-                         ) {
-                             if (selectedImportFile != null) {
-                                 OutlinedButton(
-                                     onClick = { selectedImportFile = null },
-                                     modifier = Modifier.weight(1f),
-                                     shape = RoundedCornerShape(10.dp)
-                                 ) {
-                                     Text("Quay lại")
-                                 }
-                             }
-
-                             Button(
-                                 onClick = { 
-                                     showImportDialog = false 
-                                     selectedImportFile = null
-                                 },
-                                 modifier = Modifier.weight(1f),
-                                 shape = RoundedCornerShape(10.dp)
-                             ) {
-                                 Text("Hủy")
-                             }
-                         }
-                     }
-                 }
-             }
-         }
-
-         // Export Dialog
-         if (showExportDialog) {
-             Dialog(onDismissRequest = { showExportDialog = false }) {
-                 Card(
-                     shape = RoundedCornerShape(20.dp),
-                     colors = CardDefaults.cardColors(
-                         containerColor = MaterialTheme.colorScheme.surface
-                     ),
-                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                     modifier = Modifier
-                         .fillMaxWidth()
-                         .padding(16.dp)
-                 ) {
-                     Column(
-                         modifier = Modifier
-                             .padding(20.dp)
-                             .heightIn(max = 480.dp)
-                             .verticalScroll(rememberScrollState()),
-                         verticalArrangement = Arrangement.spacedBy(16.dp)
-                     ) {
-                         Text(
-                             text = "Xuất Bộ Từ Vựng",
-                             fontWeight = FontWeight.Bold,
-                             fontSize = 18.sp,
-                             textAlign = TextAlign.Center,
-                             modifier = Modifier.fillMaxWidth()
-                         )
-
-                         Text(
-                             text = "Chọn bộ từ bạn muốn xuất ra file CSV:",
-                             fontSize = 13.sp,
-                             color = MaterialTheme.colorScheme.onSurfaceVariant
-                         )
-
-                         decks.forEach { deck ->
-                             Card(
-                                 onClick = {
-                                     Toast.makeText(
-                                         context,
-                                         "Đã xuất bộ từ \"${deck.name}\" ra file CSV thành công!",
-                                         Toast.LENGTH_LONG
-                                     ).show()
-                                     showExportDialog = false
-                                 },
-                                 colors = CardDefaults.cardColors(
-                                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                 ),
-                                 modifier = Modifier.fillMaxWidth()
-                             ) {
-                                 Row(
-                                     modifier = Modifier
-                                         .fillMaxWidth()
-                                         .padding(14.dp),
-                                     horizontalArrangement = Arrangement.SpaceBetween,
-                                     verticalAlignment = Alignment.CenterVertically
-                                 ) {
-                                     Column {
-                                         Text(
-                                             text = deck.name,
-                                             fontWeight = FontWeight.Bold,
-                                             fontSize = 14.sp
-                                         )
-                                         Text(
-                                             text = "${deck.words.size} từ vựng",
-                                             fontSize = 12.sp,
-                                             color = MaterialTheme.colorScheme.onSurfaceVariant
-                                         )
-                                     }
-                                     Text(text = "📥", fontSize = 18.sp)
-                                 }
-                             }
-                         }
-
-                         Button(
-                             onClick = { showExportDialog = false },
-                             modifier = Modifier.fillMaxWidth(),
-                             shape = RoundedCornerShape(10.dp)
-                         ) {
-                             Text("Hủy")
-                         }
-                     }
-                 }
-             }
-         }
-     }
- }
+                        Button(
+                            onClick = { showExportDialog = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Hủy".translated(userProgress.appLanguage))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
