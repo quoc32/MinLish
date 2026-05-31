@@ -20,6 +20,9 @@ import com.example.minlishapp.ui.theme.MinLishAppTheme
 import com.example.minlishapp.ui.viewmodel.VocabViewModel
 import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.minlishapp.ui.viewmodel.DashboardViewModel
+import com.example.minlishapp.ui.viewmodel.FlashcardViewModel
+import com.example.minlishapp.ui.viewmodel.LoginViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,102 +53,15 @@ class MainActivity : ComponentActivity() {
             val decks by vocabViewModel.decks.collectAsState()
             val isLoadingDecks by vocabViewModel.isLoading.collectAsState()
 
-            // Daily Learning Plan
-            var dailyPlan by remember { mutableStateOf<DailyPlanData?>(null) }
-            var isLoadingDailyPlan by remember { mutableStateOf(false) }
-
-            // Lesson result tracking (for LessonComplete screen)
-            var sessionXpGained by remember { mutableIntStateOf(0) }
-            var sessionStreak by remember { mutableIntStateOf(0) }
-            var sessionAccuracy by remember { mutableIntStateOf(100) }
-            var sessionWordsReviewed by remember { mutableIntStateOf(0) }
-            var sessionCorrectCount by remember { mutableIntStateOf(0) }
-
-            // ============================================================
-            // API FETCH FUNCTIONS
-            // ============================================================
-
-            // Fetch daily plan from API
-            fun fetchDailyPlan() {
-                isLoadingDailyPlan = true
-                coroutineScope.launch {
-                    try {
-                        val response = learningRepository.getDailyPlan()
-                        if (response.isSuccessful && response.body()?.success == true) {
-                            dailyPlan = response.body()?.data
-                        } else {
-                            // Fallback mock daily plan if API fails
-                            dailyPlan = DailyPlanData(
-                                wordsPerDay = 20,
-                                newCardsCount = 0,
-                                reviewCardsCount = 0,
-                                inSessionReviewCount = 0,
-                                newCards = emptyList(),
-                                reviewCards = emptyList(),
-                                inSessionReviewCards = emptyList()
-                            )
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MainActivity", "Failed to fetch daily plan: ${e.message}")
-                        dailyPlan = DailyPlanData(
-                                wordsPerDay = 20,
-                                newCardsCount = 0,
-                                reviewCardsCount = 0,
-                                inSessionReviewCount = 0,
-                                newCards = emptyList(),
-                                reviewCards = emptyList(),
-                                inSessionReviewCards = emptyList()
-                        )
-                    } finally {
-                        isLoadingDailyPlan = false
-                    }
-                }
-            }
-            // Submit review to API
-            fun submitReviewToApi(cardId: String, quality: String) {
-                coroutineScope.launch {
-                    try {
-                        val response = learningRepository.submitReview(cardId, quality)
-                        if (response.isSuccessful && response.body()?.success == true) {
-                            val reviewData = response.body()!!.data
-                            if (reviewData != null) {
-                                // Update session stats
-                                sessionXpGained += reviewData.rewards.xpGained
-                                sessionStreak = reviewData.rewards.streak
-                                sessionWordsReviewed++
-                                if (quality != "again") sessionCorrectCount++
-                                sessionAccuracy = if (sessionWordsReviewed > 0)
-                                    (sessionCorrectCount * 100 / sessionWordsReviewed) else 100
-
-                                // Update userProgress with new XP/Level/Streak
-                                userProgress = userProgress.copy(
-                                    xp = reviewData.rewards.xpTotal,
-                                    level = reviewData.rewards.level,
-                                    streak = reviewData.rewards.streak
-                                )
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e("MainActivity", "Failed to submit review: ${e.message}")
-                    }
-                }
-            }
-
+            val dashboardViewModel: DashboardViewModel = viewModel()
+            val flashcardViewModel: FlashcardViewModel = viewModel()
+            val loginViewModel: LoginViewModel = viewModel()
             // ============================================================
             // FETCH DATA WHEN ENTERING DASHBOARD
             // ============================================================
             LaunchedEffect(currentScreen, userProgress.userId) {
                 if (currentScreen == Screen.Dashboard && userProgress.userId.isNotEmpty()) {
                     vocabViewModel.fetchDecks()
-                    fetchDailyPlan()
-                }
-                // Reset session stats when entering Flashcards
-                if (currentScreen == Screen.Flashcards) {
-                    sessionXpGained = 0
-                    sessionStreak = userProgress.streak
-                    sessionAccuracy = 100
-                    sessionWordsReviewed = 0
-                    sessionCorrectCount = 0
                 }
             }
 
@@ -173,6 +89,7 @@ class MainActivity : ComponentActivity() {
                     when (targetScreen) {
                         Screen.Splash -> SplashScreen(onNavigate = { currentScreen = it })
                         Screen.Welcome -> WelcomeScreen(
+                            loginViewModel = loginViewModel,
                             onLoginSuccess = { userId, email, displayName, targetGoal, xp, level, streak ->
                                 userProgress = userProgress.copy(
                                     userId = userId,
@@ -197,6 +114,7 @@ class MainActivity : ComponentActivity() {
                                     level = level,
                                     streak = streak
                                 )
+                                currentScreen = Screen.Dashboard
                             },
                             onNavigate = { currentScreen = it }
                         )
@@ -221,9 +139,9 @@ class MainActivity : ComponentActivity() {
                                 activeDeck = deck
                             },
                             decks = decks,
-                            dailyPlan = dailyPlan,
-                            isLoading = isLoadingDecks || isLoadingDailyPlan,
-                            onStartDailyPlan = {
+                            dashboardViewModel = dashboardViewModel,
+                            isLoadingDecks = isLoadingDecks,
+                            onStartDailyPlan = { dailyPlan ->
                                 // Build a deck from daily plan cards
                                 val planCards = dailyPlan?.let { plan ->
                                     val allCards = plan.inSessionReviewCards + plan.reviewCards + plan.newCards
@@ -282,15 +200,21 @@ class MainActivity : ComponentActivity() {
                         Screen.Flashcards -> FlashcardScreen(
                             activeDeck = activeDeck ?: decks.firstOrNull(),
                             onNavigate = { currentScreen = it },
-                            onSubmitReview = { cardId, quality ->
-                                submitReviewToApi(cardId, quality)
+                            flashcardViewModel = flashcardViewModel,
+                            userStreak = userProgress.streak,
+                            onProgressUpdated = { xp, level, streak ->
+                                userProgress = userProgress.copy(
+                                    xp = xp,
+                                    level = level,
+                                    streak = streak
+                                )
                             }
                         )
                         Screen.LessonComplete -> LessonCompleteScreen(
                             onNavigate = { currentScreen = it },
-                            xpGained = sessionXpGained,
-                            streak = sessionStreak,
-                            accuracy = sessionAccuracy
+                            xpGained = flashcardViewModel.sessionXpGained.collectAsState().value,
+                            streak = flashcardViewModel.sessionStreak.collectAsState().value,
+                            accuracy = flashcardViewModel.sessionAccuracy.collectAsState().value
                         )
                         Screen.Stats -> StatsScreen(userId = userProgress.userId, onNavigate = { currentScreen = it })
                         Screen.Profile -> ProfileScreen(

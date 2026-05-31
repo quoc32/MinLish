@@ -66,14 +66,13 @@ fun RedWhiteEmailIcon(modifier: Modifier = Modifier) {
 
 @Composable
 fun WelcomeScreen(
+    loginViewModel: com.example.minlishapp.ui.viewmodel.LoginViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onLoginSuccess: (userId: String, email: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
     onNavigate: (Screen) -> Unit
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val authRepository = remember { AuthRepository.create(context) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
+    val isLoading = loginViewModel.isLoading
+    var errorMessage = loginViewModel.errorMessage
 
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -89,48 +88,13 @@ fun WelcomeScreen(
             val account = task.getResult(ApiException::class.java)
             val idToken = account?.idToken
             if (idToken != null) {
-                isLoading = true
-                coroutineScope.launch {
-                    try {
-                        val response = authRepository.loginWithGoogle(GoogleLoginRequest(idToken))
-                        isLoading = false
-                        if (response.isSuccessful) {
-                            val body = response.body()
-                            if (body != null && body.success && body.data != null) {
-                                val profile = body.data.profile
-                                val userId = body.data.user.id
-                                val userEmail = body.data.user.email
-                                body.data.session?.accessToken?.let { TokenManager.getInstance(context).saveToken(it) }
-                                
-                                onLoginSuccess(
-                                    userId,
-                                    userEmail,
-                                    profile?.displayName ?: "Học viên",
-                                    profile?.targetGoal ?: "IELTS",
-                                    profile?.xp ?: 0,
-                                    profile?.level ?: 1,
-                                    profile?.streak ?: 0
-                                )
-                                if (profile == null) {
-                                    onNavigate(Screen.LanguageSelection)
-                                } else {
-                                    onNavigate(Screen.Dashboard)
-                                }
-                            } else {
-                                errorMessage = body?.message ?: "Đăng nhập Google thất bại!"
-                            }
-                        } else {
-                            errorMessage = "Đăng nhập Google thất bại (Mã lỗi: ${response.code()})"
-                        }
-                    } catch (e: Exception) {
-                        isLoading = false
-                        errorMessage = "Lỗi kết nối: ${e.localizedMessage}"
-                    }
+                loginViewModel.performGoogleLogin(idToken) { userId, email, dispName, goal, xp, level, streak ->
+                    onLoginSuccess(userId, email, dispName, goal, xp, level, streak)
+                    onNavigate(Screen.Dashboard)
                 }
             }
         } catch (e: ApiException) {
-            isLoading = false
-            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại."
+            loginViewModel.errorMessage = "Đăng nhập Google bị hủy hoặc thất bại."
         }
     }
 
@@ -246,7 +210,6 @@ fun WelcomeScreen(
 
                 Button(
                     onClick = {
-                        isLoading = true
                         googleSignInClient.signOut().addOnCompleteListener {
                             googleAuthLauncher.launch(googleSignInClient.signInIntent)
                         }
@@ -290,7 +253,7 @@ fun WelcomeScreen(
 
             if (errorMessage.isNotEmpty()) {
                 Toast.makeText(context, errorMessage, Toast.LENGTH_SHORT).show()
-                errorMessage = ""
+                loginViewModel.errorMessage = ""
             }
     }
 }

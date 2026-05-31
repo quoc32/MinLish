@@ -25,11 +25,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.minlishapp.data.UserProgress
-import com.example.minlishapp.data.ProfileUpdateRequest
 import com.example.minlishapp.core.network.TokenManager
-import com.example.minlishapp.data.repository.AuthRepository
 import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.minlishapp.ui.viewmodel.ProfileViewModel
 
 @Composable
 fun ProfileScreen(
@@ -37,44 +36,15 @@ fun ProfileScreen(
     onProgressUpdate: (UserProgress) -> Unit,
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
-    onNavigate: (Screen) -> Unit
+    onNavigate: (Screen) -> Unit,
+    viewModel: ProfileViewModel = viewModel()
 ) {
-    var isEditingName by remember { mutableStateOf(false) }
-    var nameInput by remember { mutableStateOf(userProgress.name) }
     val context = LocalContext.current
-    val sharedPrefs = remember { context.getSharedPreferences("minlish_prefs", Context.MODE_PRIVATE) }
-    val coroutineScope = rememberCoroutineScope()
-    val authRepository = remember { AuthRepository.create(context) }
-    var isLoading by remember { mutableStateOf(false) }
 
     // Tự động tải profile khi vào màn hình
     LaunchedEffect(Unit) {
-        try {
-            val response = authRepository.getProfile()
-            if (response.isSuccessful) {
-                val profile = response.body()?.data
-                if (profile != null) {
-                    onProgressUpdate(userProgress.copy(
-                        name = profile.displayName ?: userProgress.name,
-                        email = profile.email ?: userProgress.email,
-                        targetGoal = profile.targetGoal,
-                        xp = profile.xp,
-                        level = profile.level,
-                        streak = profile.streak
-                    ))
-                    nameInput = profile.displayName ?: userProgress.name
-                }
-            }
-        } catch (e: Exception) {
-            // Ignore for now, keep current state
-        }
+        viewModel.fetchProfile(userProgress, onProgressUpdate)
     }
-
-    var dailyReminderEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("daily_reminder_enabled", true)) }
-    var reviewReminderEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("review_reminder_enabled", true)) }
-    var dailyReminderTime by remember { mutableStateOf(sharedPrefs.getString("daily_reminder_time", "09:00") ?: "09:00") }
-    var showTimePickerDialog by remember { mutableStateOf(false) }
-    var showGoalPicker by remember { mutableStateOf(false) }
     
     val goalOptions = listOf("IELTS", "TOEIC", "Giao tiếp", "THPT Quốc gia")
 
@@ -133,10 +103,10 @@ fun ProfileScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    if (isEditingName) {
+                    if (viewModel.isEditingName) {
                         OutlinedTextField(
-                            value = nameInput,
-                            onValueChange = { nameInput = it },
+                            value = viewModel.nameInput,
+                            onValueChange = { viewModel.nameInput = it },
                             singleLine = true,
                             textStyle = androidx.compose.ui.text.TextStyle(
                                 fontWeight = FontWeight.Bold,
@@ -151,26 +121,8 @@ fun ProfileScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(onClick = {
-                            if (nameInput.isNotBlank()) {
-                                isLoading = true
-                                coroutineScope.launch {
-                                    try {
-                                        val response = authRepository.updateProfile(ProfileUpdateRequest(displayName = nameInput))
-                                        isLoading = false
-                                        if (response.isSuccessful) {
-                                            onProgressUpdate(userProgress.copy(name = nameInput))
-                                            isEditingName = false
-                                            Toast.makeText(context, "Đã đổi tên thành công!", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Đổi tên thất bại!", Toast.LENGTH_SHORT).show()
-                                        }
-                                    } catch (e: Exception) {
-                                        isLoading = false
-                                        Toast.makeText(context, "Lỗi kết nối", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                        }, enabled = !isLoading) {
+                            viewModel.saveProfileName(userProgress, onProgressUpdate)
+                        }, enabled = !viewModel.isLoading) {
                             Text("Lưu", fontWeight = FontWeight.Bold)
                         }
                     } else {
@@ -184,7 +136,7 @@ fun ProfileScreen(
                                 fontSize = 18.sp
                             )
                             IconButton(
-                                onClick = { isEditingName = true },
+                                onClick = { viewModel.isEditingName = true },
                                 modifier = Modifier.size(24.dp)
                             ) {
                                 Icon(
@@ -254,7 +206,7 @@ fun ProfileScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { showGoalPicker = true }
+                            .clickable { viewModel.showGoalPicker = true }
                             .padding(horizontal = 16.dp, vertical = 16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -351,29 +303,19 @@ fun ProfileScreen(
                             }
                         }
                         Switch(
-                            checked = dailyReminderEnabled,
-                            onCheckedChange = { isEnabled ->
-                                dailyReminderEnabled = isEnabled
-                                sharedPrefs.edit().putBoolean("daily_reminder_enabled", isEnabled).apply()
-                                if (isEnabled) {
-                                    ReminderManager.scheduleDailyReminder(context, dailyReminderTime)
-                                    Toast.makeText(context, "Đã bật nhắc nhở lúc $dailyReminderTime hàng ngày!", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    ReminderManager.cancelReminder(context)
-                                    Toast.makeText(context, "Đã tắt nhắc nhở hàng ngày!", Toast.LENGTH_SHORT).show()
-                                }
-                            }
+                            checked = viewModel.dailyReminderEnabled,
+                            onCheckedChange = { viewModel.updateDailyReminderEnabled(it) }
                         )
                     }
 
-                    if (dailyReminderEnabled) {
+                    if (viewModel.dailyReminderEnabled) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), modifier = Modifier.padding(horizontal = 16.dp))
 
                         // Dòng 1b: Chọn giờ nhắc học
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { showTimePickerDialog = true }
+                                .clickable { viewModel.showTimePickerDialog = true }
                                 .padding(horizontal = 16.dp, vertical = 16.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -385,7 +327,7 @@ fun ProfileScreen(
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = dailyReminderTime,
+                                    text = viewModel.dailyReminderTime,
                                     fontSize = 14.sp,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
@@ -423,16 +365,8 @@ fun ProfileScreen(
                             }
                         }
                         Switch(
-                            checked = reviewReminderEnabled,
-                            onCheckedChange = { isEnabled ->
-                                reviewReminderEnabled = isEnabled
-                                sharedPrefs.edit().putBoolean("review_reminder_enabled", isEnabled).apply()
-                                if (isEnabled) {
-                                    Toast.makeText(context, "Đã bật nhắc nhở ôn tập SM-2!", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "Đã tắt nhắc nhở ôn tập!", Toast.LENGTH_SHORT).show()
-                                }
-                            }
+                            checked = viewModel.reviewReminderEnabled,
+                            onCheckedChange = { viewModel.updateReviewReminderEnabled(it) }
                         )
                     }
                 }
@@ -496,8 +430,8 @@ fun ProfileScreen(
         }
 
         // Time Picker Dialog Mock
-        if (showTimePickerDialog) {
-            Dialog(onDismissRequest = { showTimePickerDialog = false }) {
+        if (viewModel.showTimePickerDialog) {
+            Dialog(onDismissRequest = { viewModel.showTimePickerDialog = false }) {
                 Card(
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
@@ -549,20 +483,11 @@ fun ProfileScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     rowPresets.forEach { (timeStr, label) ->
-                                        val isSelected = dailyReminderTime == timeStr
+                                        val isSelected = viewModel.dailyReminderTime == timeStr
                                         Card(
                                             onClick = {
-                                                dailyReminderTime = timeStr
-                                                sharedPrefs.edit().putString("daily_reminder_time", timeStr).apply()
-                                                if (dailyReminderEnabled) {
-                                                    ReminderManager.scheduleDailyReminder(context, timeStr)
-                                                }
-                                                Toast.makeText(
-                                                    context,
-                                                    "Đã hẹn giờ nhắc học lúc $timeStr hàng ngày!",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                                showTimePickerDialog = false
+                                                viewModel.updateDailyReminderTime(timeStr)
+                                                viewModel.showTimePickerDialog = false
                                             },
                                             shape = RoundedCornerShape(10.dp),
                                             colors = CardDefaults.cardColors(
@@ -603,19 +528,14 @@ fun ProfileScreen(
                         // Button for Custom Time Picker
                         Button(
                             onClick = {
-                                val hour = dailyReminderTime.split(":").getOrNull(0)?.toIntOrNull() ?: 9
-                                val minute = dailyReminderTime.split(":").getOrNull(1)?.toIntOrNull() ?: 0
+                                val hour = viewModel.dailyReminderTime.split(":").getOrNull(0)?.toIntOrNull() ?: 9
+                                val minute = viewModel.dailyReminderTime.split(":").getOrNull(1)?.toIntOrNull() ?: 0
                                 TimePickerDialog(
                                     context,
                                     { _, selectedHour, selectedMinute ->
                                         val formattedTime = String.format("%02d:%02d", selectedHour, selectedMinute)
-                                        dailyReminderTime = formattedTime
-                                        sharedPrefs.edit().putString("daily_reminder_time", formattedTime).apply()
-                                        if (dailyReminderEnabled) {
-                                            ReminderManager.scheduleDailyReminder(context, formattedTime)
-                                        }
-                                        Toast.makeText(context, "Đã hẹn giờ nhắc học lúc $formattedTime hàng ngày!", Toast.LENGTH_SHORT).show()
-                                        showTimePickerDialog = false
+                                        viewModel.updateDailyReminderTime(formattedTime)
+                                        viewModel.showTimePickerDialog = false
                                     },
                                     hour,
                                     minute,
@@ -628,25 +548,17 @@ fun ProfileScreen(
                                 containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                                 contentColor = MaterialTheme.colorScheme.primary
                             ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                            contentPadding = PaddingValues(vertical = 12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Tùy chỉnh chọn giờ ⚙️", fontWeight = FontWeight.Bold)
+                            Text("Tự chọn giờ khác...", fontWeight = FontWeight.Bold)
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             OutlinedButton(
-                                onClick = { showTimePickerDialog = false },
+                                onClick = { viewModel.showTimePickerDialog = false },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
@@ -658,8 +570,8 @@ fun ProfileScreen(
             }
         }
         // Goal Picker Dialog
-        if (showGoalPicker) {
-            Dialog(onDismissRequest = { showGoalPicker = false }) {
+        if (viewModel.showGoalPicker) {
+            Dialog(onDismissRequest = { viewModel.showGoalPicker = false }) {
                 Card(
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -683,23 +595,7 @@ fun ProfileScreen(
                                 val isSelected = userProgress.targetGoal == goal
                                 Card(
                                     onClick = {
-                                        showGoalPicker = false
-                                        isLoading = true
-                                        coroutineScope.launch {
-                                            try {
-                                                val response = authRepository.updateProfile(ProfileUpdateRequest(targetGoal = goal))
-                                                isLoading = false
-                                                if (response.isSuccessful) {
-                                                    onProgressUpdate(userProgress.copy(targetGoal = goal))
-                                                    Toast.makeText(context, "Đã cập nhật mục tiêu học!", Toast.LENGTH_SHORT).show()
-                                                } else {
-                                                    Toast.makeText(context, "Cập nhật thất bại!", Toast.LENGTH_SHORT).show()
-                                                }
-                                            } catch (e: Exception) {
-                                                isLoading = false
-                                                Toast.makeText(context, "Lỗi kết nối", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
+                                        viewModel.saveProfileGoal(goal, userProgress, onProgressUpdate)
                                     },
                                     colors = CardDefaults.cardColors(
                                         containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -718,7 +614,7 @@ fun ProfileScreen(
                         }
                         
                         TextButton(
-                            onClick = { showGoalPicker = false },
+                            onClick = { viewModel.showGoalPicker = false },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Đóng", fontWeight = FontWeight.Bold)

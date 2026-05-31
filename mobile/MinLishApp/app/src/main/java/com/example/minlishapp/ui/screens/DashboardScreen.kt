@@ -28,6 +28,9 @@ import com.example.minlishapp.data.DailyPlanData
 import com.example.minlishapp.data.UserProgress
 import com.example.minlishapp.ui.theme.ColorStreakFlame
 
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.minlishapp.ui.viewmodel.DashboardViewModel
+
 @Composable
 fun DashboardScreen(
     userProgress: UserProgress,
@@ -37,11 +40,19 @@ fun DashboardScreen(
     activeDeck: Deck?,
     onActiveDeckSelect: (Deck) -> Unit,
     decks: List<Deck>,
-    dailyPlan: DailyPlanData? = null,
-    isLoading: Boolean = false,
-    onStartDailyPlan: () -> Unit = {},
+    dashboardViewModel: DashboardViewModel = viewModel(),
+    isLoadingDecks: Boolean = false,
+    onStartDailyPlan: (DailyPlanData?) -> Unit = {},
     onStartStudy: (Deck) -> Unit = {}
 ) {
+    val dailyPlan by dashboardViewModel.dailyPlan.collectAsState()
+    val isLoadingDailyPlan by dashboardViewModel.isLoadingDailyPlan.collectAsState()
+    val isLoading = isLoadingDecks || isLoadingDailyPlan
+
+    LaunchedEffect(Unit) {
+        dashboardViewModel.fetchDailyPlan()
+    }
+
     val filteredDecks = remember(decks) {
         decks
     }
@@ -173,72 +184,74 @@ fun DashboardScreen(
                                             strokeWidth = 2.dp
                                         )
                                     }
-                                } else if (dailyPlan != null) {
-                                    Column(
-                                        modifier = Modifier.padding(16.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Text(
-                                            text = "📋 Kế Hoạch Hôm Nay",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceEvenly
+                                } else {
+                                    val plan = dailyPlan
+                                    if (plan != null) {
+                                        Column(
+                                            modifier = Modifier.padding(16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(text = "🆕", fontSize = 20.sp)
-                                                Text(
-                                                    text = "${dailyPlan.newCardsCount}",
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 18.sp,
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                                )
-                                                Text(
-                                                    text = "từ mới",
-                                                    fontSize = 11.sp,
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                                )
-                                            }
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(text = "📝", fontSize = 20.sp)
-                                                Text(
-                                                    text = "${dailyPlan.reviewCardsCount}",
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 18.sp,
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                                )
-                                                Text(
-                                                    text = "từ ôn",
-                                                    fontSize = 11.sp,
-                                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                                )
-                                            }
-                                            if (dailyPlan.inSessionReviewCount > 0) {
+                                            Text(
+                                                text = "📋 Kế Hoạch Hôm Nay",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 15.sp,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            )
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceEvenly
+                                            ) {
                                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    Text(text = "🔄", fontSize = 20.sp)
+                                                    Text(text = "🆕", fontSize = 20.sp)
                                                     Text(
-                                                        text = "${dailyPlan.inSessionReviewCount}",
+                                                        text = "${plan.newCardsCount}",
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 18.sp,
                                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                                     )
                                                     Text(
-                                                        text = "ôn lại ngay",
+                                                        text = "từ mới",
                                                         fontSize = 11.sp,
                                                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                                     )
                                                 }
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(text = "📝", fontSize = 20.sp)
+                                                    Text(
+                                                        text = "${plan.reviewCardsCount}",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 18.sp,
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                    )
+                                                    Text(
+                                                        text = "từ ôn",
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                                    )
+                                                }
+                                                if (plan.inSessionReviewCount > 0) {
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        Text(text = "🔄", fontSize = 20.sp)
+                                                        Text(
+                                                            text = "${plan.inSessionReviewCount}",
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 18.sp,
+                                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                        )
+                                                        Text(
+                                                            text = "ôn lại ngay",
+                                                            fontSize = 11.sp,
+                                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                                        )
+                                                    }
+                                                }
                                             }
-                                        }
 
-                                        val totalCards = dailyPlan.newCardsCount + dailyPlan.reviewCardsCount + dailyPlan.inSessionReviewCount
-                                        if (totalCards > 0) {
-                                            Button(
-                                                onClick = onStartDailyPlan,
+                                            val totalCards = plan.newCardsCount + plan.reviewCardsCount + plan.inSessionReviewCount
+                                            if (totalCards > 0) {
+                                                Button(
+                                                    onClick = { onStartDailyPlan(plan) },
                                                 modifier = Modifier.fillMaxWidth(),
                                                 shape = RoundedCornerShape(12.dp),
                                                 colors = ButtonDefaults.buttonColors(
@@ -250,15 +263,16 @@ fun DashboardScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     modifier = Modifier.padding(vertical = 4.dp)
                                                 )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                                            } // closes Button
+                                        } // closes if (totalCards > 0)
+                                    } // closes Column
+                                } // closes if (plan != null)
+                            } // closes else
+                        } // closes Card
 
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
-                    }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    } // closes item
+                } // closes if (dailyPlan != null || isLoading)
 
                     item {
                         Text(

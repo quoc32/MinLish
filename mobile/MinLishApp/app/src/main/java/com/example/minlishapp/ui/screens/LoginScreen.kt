@@ -28,39 +28,19 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import com.example.minlishapp.data.repository.AuthRepository
-import com.example.minlishapp.data.LoginRequest
-import com.example.minlishapp.data.LoginResponse
-import com.example.minlishapp.data.RegisterRequest
-import com.example.minlishapp.data.GoogleLoginRequest
-import com.example.minlishapp.core.network.TokenManager
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.minlishapp.ui.viewmodel.LoginViewModel
 
 @Composable
 fun LoginScreen(
+    viewModel: LoginViewModel = viewModel(),
     onLoginSuccess: (userId: String, email: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
     onNavigate: (Screen) -> Unit
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val authRepository = remember { AuthRepository.create(context) }
-    var isLoading by remember { mutableStateOf(false) }
-    var isLoginTab by remember { mutableStateOf(true) }
-    
-    // Form fields
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    
-    // Password visibility toggle
-    var isPasswordVisible by remember { mutableStateOf(false) }
-    var isConfirmPasswordVisible by remember { mutableStateOf(false) }
-    
-    // Validation Error Message
-    var errorMessage by remember { mutableStateOf("") }
 
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -76,48 +56,10 @@ fun LoginScreen(
             val account = task.getResult(ApiException::class.java)
             val idToken = account?.idToken
             if (idToken != null) {
-                isLoading = true
-                coroutineScope.launch {
-                    try {
-                        val response = authRepository.loginWithGoogle(GoogleLoginRequest(idToken))
-                        isLoading = false
-                        if (response.isSuccessful) {
-                            val body = response.body()
-                            if (body != null && body.success && body.data != null) {
-                                val profile = body.data.profile
-                                val userId = body.data.user.id
-                                val userEmail = body.data.user.email
-                                body.data.session?.accessToken?.let { TokenManager.getInstance(context).saveToken(it) }
-                                
-                                onLoginSuccess(
-                                    userId,
-                                    userEmail,
-                                    profile?.displayName ?: "Học viên",
-                                    profile?.targetGoal ?: "IELTS",
-                                    profile?.xp ?: 0,
-                                    profile?.level ?: 1,
-                                    profile?.streak ?: 0
-                                )
-                                if (profile == null) {
-                                    onNavigate(Screen.LanguageSelection)
-                                } else {
-                                    onNavigate(Screen.Dashboard)
-                                }
-                            } else {
-                                errorMessage = body?.message ?: "Đăng nhập Google thất bại!"
-                            }
-                        } else {
-                            errorMessage = "Đăng nhập Google thất bại (Mã lỗi: ${response.code()})"
-                        }
-                    } catch (e: Exception) {
-                        isLoading = false
-                        errorMessage = "Lỗi kết nối: ${e.localizedMessage}"
-                    }
-                }
+                viewModel.performGoogleLogin(idToken, onLoginSuccess)
             }
         } catch (e: ApiException) {
-            isLoading = false
-            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại."
+            viewModel.errorMessage = "Đăng nhập Google bị hủy hoặc thất bại."
         }
     }
 
@@ -175,13 +117,13 @@ fun LoginScreen(
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = if (isLoginTab) "Chào mừng trở lại!" else "Tạo tài khoản mới",
+                    text = if (viewModel.isLoginTab) "Chào mừng trở lại!" else "Tạo tài khoản mới",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = if (isLoginTab) "Đăng nhập để tiếp tục lộ trình học" else "Đăng ký nhanh chóng chỉ với vài bước",
+                    text = if (viewModel.isLoginTab) "Đăng nhập để tiếp tục lộ trình học" else "Đăng ký nhanh chóng chỉ với vài bước",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -199,7 +141,7 @@ fun LoginScreen(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 listOf(true to "Đăng nhập", false to "Đăng ký").forEach { (tabState, label) ->
-                    val isSelected = isLoginTab == tabState
+                    val isSelected = viewModel.isLoginTab == tabState
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -209,8 +151,8 @@ fun LoginScreen(
                                 else Color.Transparent
                             )
                             .clickable {
-                                isLoginTab = tabState
-                                errorMessage = "" // clear errors
+                                viewModel.isLoginTab = tabState
+                                viewModel.errorMessage = "" // clear errors
                             }
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
@@ -234,8 +176,8 @@ fun LoginScreen(
             ) {
                 // Email
                 OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it; errorMessage = "" },
+                    value = viewModel.email,
+                    onValueChange = { viewModel.email = it; viewModel.errorMessage = "" },
                     label = { Text("Địa chỉ Email") },
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                     singleLine = true,
@@ -252,21 +194,21 @@ fun LoginScreen(
 
                 // Password
                 OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it; errorMessage = "" },
+                    value = viewModel.password,
+                    onValueChange = { viewModel.password = it; viewModel.errorMessage = "" },
                     label = { Text("Mật khẩu") },
                     leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                     trailingIcon = {
-                        val image = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                        val image = if (viewModel.isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                        IconButton(onClick = { viewModel.isPasswordVisible = !viewModel.isPasswordVisible }) {
                             Icon(imageVector = image, contentDescription = null)
                         }
                     },
                     singleLine = true,
-                    visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    visualTransformation = if (viewModel.isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
-                        imeAction = if (isLoginTab) ImeAction.Done else ImeAction.Next
+                        imeAction = if (viewModel.isLoginTab) ImeAction.Done else ImeAction.Next
                     ),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
@@ -276,20 +218,20 @@ fun LoginScreen(
                 )
 
                 // Confirm Password (đăng ký)
-                AnimatedVisibility(visible = !isLoginTab) {
+                AnimatedVisibility(visible = !viewModel.isLoginTab) {
                     OutlinedTextField(
-                        value = confirmPassword,
-                        onValueChange = { confirmPassword = it; errorMessage = "" },
+                        value = viewModel.confirmPassword,
+                        onValueChange = { viewModel.confirmPassword = it; viewModel.errorMessage = "" },
                         label = { Text("Xác nhận mật khẩu") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         trailingIcon = {
-                            val image = if (isConfirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-                            IconButton(onClick = { isConfirmPasswordVisible = !isConfirmPasswordVisible }) {
+                            val image = if (viewModel.isConfirmPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                            IconButton(onClick = { viewModel.isConfirmPasswordVisible = !viewModel.isConfirmPasswordVisible }) {
                                 Icon(imageVector = image, contentDescription = null)
                             }
                         },
                         singleLine = true,
-                        visualTransformation = if (isConfirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        visualTransformation = if (viewModel.isConfirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
                             imeAction = ImeAction.Done
@@ -304,9 +246,9 @@ fun LoginScreen(
             }
 
             // Error display
-            if (errorMessage.isNotEmpty()) {
+            if (viewModel.errorMessage.isNotEmpty()) {
                 Text(
-                    text = errorMessage,
+                    text = viewModel.errorMessage,
                     color = MaterialTheme.colorScheme.error,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
@@ -318,113 +260,23 @@ fun LoginScreen(
             // Submit Button
             Button(
                 onClick = {
-                    if (email.isBlank() || password.isBlank()) {
-                        errorMessage = "Vui lòng nhập đầy đủ thông tin!"
-                    } else if (!email.contains("@") || !email.contains(".")) {
-                        errorMessage = "Địa chỉ email không hợp lệ!"
-                    } else if (password.length < 6) {
-                        errorMessage = "Mật khẩu phải chứa ít nhất 6 ký tự!"
-                    } else if (!isLoginTab && password != confirmPassword) {
-                        errorMessage = "Mật khẩu xác nhận không khớp!"
+                    if (viewModel.isLoginTab) {
+                        viewModel.performLogin(onLoginSuccess)
                     } else {
-                        if (isLoginTab) {
-                            isLoading = true
-                            coroutineScope.launch {
-                                try {
-                                    val response = authRepository.login(LoginRequest(email, password))
-                                    isLoading = false
-                                    if (response.isSuccessful) {
-                                        val body = response.body()
-                                        if (body != null && body.success && body.data != null) {
-                                            val profile = body.data.profile
-                                            val userId = body.data.user.id
-                                            val userEmail = body.data.user.email
-                                            body.data.session?.accessToken?.let { TokenManager.getInstance(context).saveToken(it) }
-                                            onLoginSuccess(
-                                                userId,
-                                                userEmail,
-                                                profile?.displayName ?: "Học viên",
-                                                profile?.targetGoal ?: "IELTS",
-                                                profile?.xp ?: 0,
-                                                profile?.level ?: 1,
-                                                profile?.streak ?: 0
-                                            )
-                                            if (profile == null) {
-                                                onNavigate(Screen.LanguageSelection)
-                                            } else {
-                                                onNavigate(Screen.Dashboard)
-                                            }
-                                        } else {
-                                            errorMessage = body?.message ?: "Đăng nhập thất bại!"
-                                        }
-                                    } else {
-                                        val errorJson = response.errorBody()?.string()
-                                        val errorMsg = try {
-                                            com.google.gson.Gson().fromJson(errorJson, LoginResponse::class.java)?.message
-                                        } catch (jsonEx: Exception) {
-                                            null
-                                        }
-                                        errorMessage = errorMsg ?: "Đăng nhập thất bại (Mã lỗi: ${response.code()})"
-                                    }
-                                } catch (e: Exception) {
-                                    isLoading = false
-                                    errorMessage = "Lỗi kết nối: ${e.localizedMessage ?: "Không thể kết nối tới máy chủ"}"
-                                }
-                            }
-                        } else {
-                            isLoading = true
-                            coroutineScope.launch {
-                                try {
-                                    val displayName = email.substringBefore("@").replaceFirstChar { it.uppercase() }
-                                    val response = authRepository.register(
-                                        com.example.minlishapp.data.RegisterRequest(email, password, displayName, "IELTS")
-                                    )
-                                    isLoading = false
-                                    if (response.isSuccessful) {
-                                        val body = response.body()
-                                        if (body != null && body.success && body.data != null) {
-                                            val profile = body.data.profile
-                                            val userId = body.data.user.id
-                                            val userEmail = body.data.user.email
-                                            body.data.session?.accessToken?.let { TokenManager.getInstance(context).saveToken(it) }
-                                            onLoginSuccess(
-                                                userId,
-                                                userEmail,
-                                                profile?.displayName ?: displayName,
-                                                profile?.targetGoal ?: "IELTS",
-                                                profile?.xp ?: 0,
-                                                profile?.level ?: 1,
-                                                profile?.streak ?: 0
-                                            )
-                                            Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
-                                            onNavigate(Screen.LanguageSelection)
-                                        } else {
-                                            errorMessage = body?.message ?: "Đăng ký thất bại!"
-                                        }
-                                    } else {
-                                        val errorJson = response.errorBody()?.string()
-                                        val errorMsg = try {
-                                            com.google.gson.Gson().fromJson(errorJson, LoginResponse::class.java)?.message
-                                        } catch (jsonEx: Exception) {
-                                            null
-                                        }
-                                        errorMessage = errorMsg ?: "Đăng ký thất bại (Mã lỗi: ${response.code()})"
-                                    }
-                                } catch (e: Exception) {
-                                    isLoading = false
-                                    errorMessage = "Lỗi kết nối: ${e.localizedMessage ?: "Không thể kết nối tới máy chủ"}"
-                                }
-                            }
+                        viewModel.performRegister { userId, email, dispName, goal, xp, level, streak ->
+                            onLoginSuccess(userId, email, dispName, goal, xp, level, streak)
+                            Toast.makeText(context, "Đăng ký thành công!", Toast.LENGTH_SHORT).show()
+                            onNavigate(Screen.LanguageSelection)
                         }
                     }
                 },
-                enabled = !isLoading,
+                enabled = !viewModel.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                if (isLoading) {
+                if (viewModel.isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
@@ -432,7 +284,7 @@ fun LoginScreen(
                     )
                 } else {
                     Text(
-                        text = if (isLoginTab) "Đăng nhập" else "Đăng ký",
+                        text = if (viewModel.isLoginTab) "Đăng nhập" else "Đăng ký",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -440,15 +292,15 @@ fun LoginScreen(
             }
 
             // Google Login Button
-            if (isLoginTab) {
+            if (viewModel.isLoginTab) {
                 OutlinedButton(
                     onClick = {
-                        isLoading = true
+                        viewModel.isLoading = true
                         googleSignInClient.signOut().addOnCompleteListener {
                             googleAuthLauncher.launch(googleSignInClient.signInIntent)
                         }
                     },
-                    enabled = !isLoading,
+                    enabled = !viewModel.isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -471,6 +323,4 @@ fun LoginScreen(
 
         }
     }
-
-
 }
