@@ -28,16 +28,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import com.example.minlishapp.R
-import com.example.minlishapp.data.GoogleLoginRequest
-import com.example.minlishapp.core.network.TokenManager
 import com.example.minlishapp.data.repository.AuthRepository
 import com.example.minlishapp.core.utils.translated
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
 
 @Composable
@@ -79,64 +72,6 @@ fun WelcomeScreen(
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
-    val gso = remember {
-        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken("322809065976-21g2210m0rc213m2brjabr0vol0ar8jj.apps.googleusercontent.com")
-            .requestEmail()
-            .build()
-    }
-    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
-
-    val googleAuthLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(ApiException::class.java)
-            val idToken = account?.idToken
-            if (idToken != null) {
-                isLoading = true
-                coroutineScope.launch {
-                    try {
-                        val response = authRepository.loginWithGoogle(GoogleLoginRequest(idToken))
-                        isLoading = false
-                        if (response.isSuccessful) {
-                            val body = response.body()
-                            if (body != null && body.success && body.data != null) {
-                                val profile = body.data.profile
-                                val userId = body.data.user.id
-                                val userEmail = body.data.user.email
-                                body.data.session?.accessToken?.let { TokenManager.getInstance(context).saveToken(it) }
-                                
-                                onLoginSuccess(
-                                    userId,
-                                    userEmail,
-                                    profile?.displayName ?: "Học viên",
-                                    profile?.targetGoal ?: "IELTS",
-                                    profile?.xp ?: 0,
-                                    profile?.level ?: 1,
-                                    profile?.streak ?: 0
-                                )
-                                if (profile == null) {
-                                    onNavigate(Screen.LanguageSelection)
-                                } else {
-                                    onNavigate(Screen.Dashboard)
-                                }
-                            } else {
-                                errorMessage = body?.message ?: "Đăng nhập Google thất bại!".translated(appLanguage)
-                            }
-                        } else {
-                            errorMessage = "Đăng nhập Google thất bại".translated(appLanguage) + " (Mã lỗi: ${response.code()})"
-                        }
-                    } catch (e: Exception) {
-                        isLoading = false
-                        errorMessage = "Lỗi kết nối".translated(appLanguage) + ": ${e.localizedMessage}"
-                    }
-                }
-            }
-        } catch (e: ApiException) {
-            isLoading = false
-            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại.".translated(appLanguage)
-        }
-    }
 
     BoxWithConstraints(
         modifier = Modifier

@@ -166,8 +166,10 @@ async function updateProfile(userId, updates) {
 }
 
 async function forgotPassword(email) {
+  const redirectToUrl = process.env.RESET_REDIRECT_URL || 
+                        `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/auth/reset-password-callback`;
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: 'minlish://reset-password'
+    redirectTo: redirectToUrl
   });
 
   if (error) {

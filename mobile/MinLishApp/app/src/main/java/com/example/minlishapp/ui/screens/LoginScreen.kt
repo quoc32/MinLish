@@ -139,7 +139,8 @@ fun LoginScreen(
             }
         } catch (e: ApiException) {
             isLoading = false
-            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại.".translated(appLanguage)
+            e.printStackTrace()
+            errorMessage = "Đăng nhập Google bị hủy hoặc thất bại.".translated(appLanguage) + " (Code: ${e.statusCode})"
         }
     }
 
