@@ -316,12 +316,16 @@ fun VocabScreen(
                                 .offset(x = alignmentBias.dp)
                         ) {
                             // Render thẻ chủ đề học từ chuẩn thiết kế (Image 1)
+                            val isCompleted = deck.progress >= 1.0f
                             Card(
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surface
+                                    containerColor = if (isCompleted) Color(0xFFDCFCE7) else MaterialTheme.colorScheme.surface
                                 ),
                                 shape = RoundedCornerShape(16.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isCompleted) Color(0xFF10B981) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                ),
                                 modifier = Modifier
                                     .width(280.dp)
                                     .padding(vertical = 4.dp),
@@ -333,6 +337,7 @@ fun VocabScreen(
                                 ) {
                                     var expandedMenu by remember { mutableStateOf(false) }
                                     var showEditDialog by remember { mutableStateOf(false) }
+                                    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -387,13 +392,7 @@ fun VocabScreen(
                                                     text = { Text("Xóa bộ từ".translated(userProgress.appLanguage)) },
                                                     onClick = { 
                                                         expandedMenu = false
-                                                        vocabViewModel.deleteDeck(deck.id) { success, msg ->
-                                                            if (success) {
-                                                                Toast.makeText(context, "Đã xóa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
-                                                            } else {
-                                                                Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
-                                                            }
-                                                        }
+                                                        showDeleteConfirmDialog = true
                                                     }
                                                 )
                                             }
@@ -443,28 +442,81 @@ fun VocabScreen(
                                                     )
 
                                                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                                        var showConfirmSaveDeck by remember { mutableStateOf(false) }
+
                                                         OutlinedButton(onClick = { showEditDialog = false }, modifier = Modifier.weight(1f)) {
                                                             Text("Hủy".translated(userProgress.appLanguage))
                                                         }
                                                         Button(
-                                                            onClick = {
-                                                                vocabViewModel.updateDeck(deck.id, editDeckName, editDeckTags.split(",").firstOrNull()?.trim()) { success, msg ->
-                                                                    if (success) {
-                                                                        showEditDialog = false
-                                                                        Toast.makeText(context, "Đã sửa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
-                                                                    } else {
-                                                                        Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
-                                                                    }
-                                                                }
-                                                            },
+                                                            onClick = { showConfirmSaveDeck = true },
                                                             modifier = Modifier.weight(1f)
                                                         ) {
                                                             Text("Lưu".translated(userProgress.appLanguage))
+                                                        }
+
+                                                        if (showConfirmSaveDeck) {
+                                                            AlertDialog(
+                                                                onDismissRequest = { showConfirmSaveDeck = false },
+                                                                title = { Text("Xác nhận lưu".translated(userProgress.appLanguage)) },
+                                                                text = { Text("Bạn có chắc chắn muốn lưu các thay đổi này không?".translated(userProgress.appLanguage)) },
+                                                                confirmButton = {
+                                                                    Button(
+                                                                        onClick = {
+                                                                            showConfirmSaveDeck = false
+                                                                            vocabViewModel.updateDeck(deck.id, editDeckName, editDeckTags.split(",").firstOrNull()?.trim()) { success, msg ->
+                                                                                if (success) {
+                                                                                    showEditDialog = false
+                                                                                    Toast.makeText(context, "Đã sửa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                                                } else {
+                                                                                    Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    ) {
+                                                                        Text("Lưu".translated(userProgress.appLanguage))
+                                                                    }
+                                                                },
+                                                                dismissButton = {
+                                                                    OutlinedButton(onClick = { showConfirmSaveDeck = false }) {
+                                                                        Text("Hủy".translated(userProgress.appLanguage))
+                                                                    }
+                                                                }
+                                                            )
                                                         }
                                                     }
                                                 }
                                             }
                                         }
+                                    }
+
+                                    if (showDeleteConfirmDialog) {
+                                        AlertDialog(
+                                            onDismissRequest = { showDeleteConfirmDialog = false },
+                                            title = { Text("Xác nhận xóa".translated(userProgress.appLanguage)) },
+                                            text = { Text("Bạn có chắc chắn muốn xóa bộ từ này không?".translated(userProgress.appLanguage)) },
+                                            confirmButton = {
+                                                Button(
+                                                    onClick = {
+                                                        showDeleteConfirmDialog = false
+                                                        vocabViewModel.deleteDeck(deck.id) { success, msg ->
+                                                            if (success) {
+                                                                Toast.makeText(context, "Đã xóa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                            } else {
+                                                                Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                                            }
+                                                        }
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                                ) {
+                                                    Text("Xóa".translated(userProgress.appLanguage))
+                                                }
+                                            },
+                                            dismissButton = {
+                                                OutlinedButton(onClick = { showDeleteConfirmDialog = false }) {
+                                                    Text("Hủy".translated(userProgress.appLanguage))
+                                                }
+                                            }
+                                        )
                                     }
 
                                     // Title
@@ -1038,57 +1090,82 @@ fun VocabScreen(
                                         label = { Text("Ghi chú (Note)".translated(userProgress.appLanguage)) }, modifier = Modifier.fillMaxWidth()
                                     )
 
+                                    var showConfirmSaveWord by remember { mutableStateOf(false) }
+
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                                         OutlinedButton(onClick = { editingCard = null }, modifier = Modifier.weight(1f)) {
                                             Text("Hủy".translated(userProgress.appLanguage))
                                         }
                                         Button(
-                                            onClick = {
-                                                if (editWord.isNotBlank() && editMeaning.isNotBlank()) {
-                                                    val updatedWord = editingCard!!.copy(
-                                                        word = editWord.trim(),
-                                                        pronunciation = editPronunciation.trim(),
-                                                        meaning = editMeaning.trim(),
-                                                        description = editDescription.trim(),
-                                                        example = editExample.trim(),
-                                                        exampleTranslation = editExampleTrans.trim(),
-                                                        wordType = editWordType,
-                                                        collocations = editCollocations.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                                                        synonyms = editSynonyms.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                                                        relatedWords = editRelatedWords.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                                                        note = editNote.trim()
-                                                    )
-                                                    vocabViewModel.updateCard(
-                                                        cardId = updatedWord.id,
-                                                        deckId = selectedDeckForManaging!!.id,
-                                                        word = updatedWord
-                                                    ) { success, msg ->
-                                                        if (success) {
-                                                            Toast.makeText(context, "Cập nhật thành công".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
-                                                            editingCard = null
-                                                            isLoadingCards = true
-                                                            vocabViewModel.fetchDeckCards(selectedDeckForManaging!!.id) { words ->
-                                                                managingCardsList = words
-                                                                isLoadingCards = false
-                                                            }
-                                                        } else {
-                                                            Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    }
-                                                } else {
-                                                    Toast.makeText(context, "Vui lòng nhập đủ các trường bắt buộc".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
-                                                }
-                                            },
+                                            onClick = { showConfirmSaveWord = true },
                                             modifier = Modifier.weight(1f)
                                         ) {
                                             Text("Lưu".translated(userProgress.appLanguage))
                                         }
                                     }
+
+                                    if (showConfirmSaveWord) {
+                                        AlertDialog(
+                                            onDismissRequest = { showConfirmSaveWord = false },
+                                            title = { Text("Xác nhận lưu".translated(userProgress.appLanguage)) },
+                                            text = { Text("Bạn có chắc chắn muốn lưu các thay đổi của từ vựng này không?".translated(userProgress.appLanguage)) },
+                                            confirmButton = {
+                                                Button(
+                                                    onClick = {
+                                                        showConfirmSaveWord = false
+                                                        if (editWord.isNotBlank() && editMeaning.isNotBlank()) {
+                                                            val updatedWord = editingCard!!.copy(
+                                                                word = editWord.trim(),
+                                                                pronunciation = editPronunciation.trim(),
+                                                                meaning = editMeaning.trim(),
+                                                                description = editDescription.trim(),
+                                                                example = editExample.trim(),
+                                                                exampleTranslation = editExampleTrans.trim(),
+                                                                wordType = editWordType,
+                                                                collocations = editCollocations.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                                                                synonyms = editSynonyms.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                                                                relatedWords = editRelatedWords.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                                                                note = editNote.trim()
+                                                            )
+                                                            vocabViewModel.updateCard(
+                                                                cardId = updatedWord.id,
+                                                                deckId = selectedDeckForManaging!!.id,
+                                                                word = updatedWord
+                                                            ) { success, msg ->
+                                                                if (success) {
+                                                                    Toast.makeText(context, "Cập nhật thành công".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                                    editingCard = null
+                                                                    isLoadingCards = true
+                                                                    vocabViewModel.fetchDeckCards(selectedDeckForManaging!!.id) { words ->
+                                                                        managingCardsList = words
+                                                                        isLoadingCards = false
+                                                                    }
+                                                                } else {
+                                                                    Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                                                }
+                                                            }
+                                                        } else {
+                                                            Toast.makeText(context, "Vui lòng nhập đủ các trường bắt buộc".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                ) {
+                                                    Text("Lưu".translated(userProgress.appLanguage))
+                                                }
+                                            },
+                                            dismissButton = {
+                                                OutlinedButton(onClick = { showConfirmSaveWord = false }) {
+                                                    Text("Hủy".translated(userProgress.appLanguage))
+                                                }
+                                            }
+                                        )
+                                    }
                                 }
                             } else {
+                                var cardToDelete by remember { mutableStateOf<com.example.minlishapp.data.Word?>(null) }
+
                                 // List of Cards
                                 LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier.fillMaxSize().weight(1f),
                                     contentPadding = PaddingValues(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
@@ -1111,21 +1188,44 @@ fun VocabScreen(
                                                 IconButton(onClick = { editingCard = card }) {
                                                     Icon(Icons.Default.Edit, contentDescription = "Sửa".translated(userProgress.appLanguage), tint = MaterialTheme.colorScheme.primary)
                                                 }
-                                                IconButton(onClick = {
-                                                    vocabViewModel.deleteCard(card.id) { success, msg ->
-                                                        if (success) {
-                                                            Toast.makeText(context, "Đã xóa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
-                                                            managingCardsList = managingCardsList.filter { it.id != card.id }
-                                                        } else {
-                                                            Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    }
-                                                }) {
+                                                IconButton(onClick = { cardToDelete = card }) {
                                                     Icon(Icons.Default.Delete, contentDescription = "Xóa".translated(userProgress.appLanguage), tint = MaterialTheme.colorScheme.error)
                                                 }
                                             }
                                         }
                                     }
+                                }
+
+                                if (cardToDelete != null) {
+                                    AlertDialog(
+                                        onDismissRequest = { cardToDelete = null },
+                                        title = { Text("Xác nhận xóa".translated(userProgress.appLanguage)) },
+                                        text = { Text("Bạn có chắc chắn muốn xóa từ vựng '${cardToDelete?.word}' không?".translated(userProgress.appLanguage)) },
+                                        confirmButton = {
+                                            Button(
+                                                onClick = {
+                                                    val targetId = cardToDelete!!.id
+                                                    cardToDelete = null
+                                                    vocabViewModel.deleteCard(targetId) { success, msg ->
+                                                        if (success) {
+                                                            Toast.makeText(context, "Đã xóa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                            managingCardsList = managingCardsList.filter { it.id != targetId }
+                                                        } else {
+                                                            Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                            ) {
+                                                Text("Xóa".translated(userProgress.appLanguage), color = Color.White)
+                                            }
+                                        },
+                                        dismissButton = {
+                                            OutlinedButton(onClick = { cardToDelete = null }) {
+                                                Text("Hủy".translated(userProgress.appLanguage))
+                                            }
+                                        }
+                                    )
                                 }
                             }
                         }

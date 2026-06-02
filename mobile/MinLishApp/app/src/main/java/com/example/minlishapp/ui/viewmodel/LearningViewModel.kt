@@ -81,6 +81,13 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
     private val _sessionCorrectCount = MutableStateFlow(0)
     val sessionCorrectCount: StateFlow<Int> = _sessionCorrectCount.asStateFlow()
 
+    // Session word status tracking
+    private val _learnedWordIds = MutableStateFlow<Set<String>>(emptySet())
+    val learnedWordIds: StateFlow<Set<String>> = _learnedWordIds.asStateFlow()
+
+    private val _reviewWordIds = MutableStateFlow<Set<String>>(emptySet())
+    val reviewWordIds: StateFlow<Set<String>> = _reviewWordIds.asStateFlow()
+
     fun fetchDailyPlan() {
         _isLoadingDailyPlan.value = true
         viewModelScope.launch {
@@ -121,6 +128,8 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
     fun initSession(words: List<Word>, initialStreak: Int) {
         _studyWords.value = words
         _currentIndex.value = 0
+        _learnedWordIds.value = emptySet()
+        _reviewWordIds.value = emptySet()
         resetSessionStats(initialStreak)
         resetWordStepStates()
     }
@@ -230,7 +239,7 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
         val wordIndex = _currentIndex.value
         val wordsList = _studyWords.value.toMutableList()
         if (wordIndex < wordsList.size) {
-            val currentWord = wordsList[wordIndex]
+            val currentWord = wordsList[wordIndex].copy()
             
             // Calculate SM-2 locally
             val res = Sm2Engine.calculate(
@@ -243,6 +252,9 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
             currentWord.easeFactor = res.second
             currentWord.intervalDays = res.third
 
+            // Cập nhật lại từ tại vị trí hiện tại
+            wordsList[wordIndex] = currentWord
+
             // Submit review API call
             val quality = when (score) {
                 0 -> "again"
@@ -253,10 +265,19 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
             onSubmitReview(currentWord.id, quality)
 
             if (score == 0) {
-                // If wrong/again, append the word copy to the end of list for re-learning
+                // Again: đánh dấu là cần ôn tập, bỏ khỏi đã học
+                _reviewWordIds.value = _reviewWordIds.value + currentWord.id
+                _learnedWordIds.value = _learnedWordIds.value - currentWord.id
+                // Append copy to end for re-learning
                 wordsList.add(currentWord.copy())
-                _studyWords.value = wordsList
+            } else {
+                // Hard/Good/Easy: đánh dấu đã học, bỏ khỏi ôn tập
+                _learnedWordIds.value = _learnedWordIds.value + currentWord.id
+                _reviewWordIds.value = _reviewWordIds.value - currentWord.id
             }
+
+            // Gán lại để kích hoạt StateFlow
+            _studyWords.value = wordsList
 
             // Move to next word
             _currentIndex.value = wordIndex + 1

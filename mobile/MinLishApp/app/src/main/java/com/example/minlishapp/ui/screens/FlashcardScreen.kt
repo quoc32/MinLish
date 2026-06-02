@@ -128,10 +128,13 @@ fun FlashcardScreen(
         allOptions
     }
 
-    // Đếm số lượng từ trạng thái học
-    val newCount = studyWords.count { it.repetitions == 0 }
-    val learnedCount = studyWords.count { it.repetitions > 0 }
-    val reviewCount = studyWords.count { it.repetitions > 0 && it.intervalDays <= 1 }
+    // Đếm số lượng từ trạng thái học dựa trên tracking sets từ ViewModel
+    val learnedWordIds by learningViewModel.learnedWordIds.collectAsState()
+    val reviewWordIds by learningViewModel.reviewWordIds.collectAsState()
+    val totalUniqueWords = studyWords.map { it.id }.toSet().size
+    val learnedCount = learnedWordIds.size
+    val reviewCount = reviewWordIds.size
+    val newCount = totalUniqueWords - learnedCount - reviewCount
 
     Box(
         modifier = Modifier
@@ -991,7 +994,7 @@ fun FlashcardScreen(
                                     .weight(1f)
                                     .height(52.dp)
                             ) {
-                                Text("Học tiếp".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold)
+                                Text("Học lại".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold)
                             }
                         }
                     } else {
