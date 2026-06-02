@@ -32,12 +32,14 @@ import com.example.minlishapp.data.Word
 import com.example.minlishapp.core.utils.Sm2Engine
 import com.example.minlishapp.core.utils.translated
 import com.example.minlishapp.ui.theme.*
+import androidx.compose.runtime.collectAsState
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
 fun FlashcardScreen(
+    learningViewModel: com.example.minlishapp.ui.viewmodel.LearningViewModel,
     activeDeck: Deck?,
     onNavigate: (Screen) -> Unit,
     onSubmitReview: (cardId: String, quality: String) -> Unit,
@@ -73,45 +75,41 @@ fun FlashcardScreen(
         }
     }
 
-    // 1. Tải danh sách từ học từ activeDeck hoặc fallback
-    val studyWords = remember(activeDeck) {
-        mutableStateListOf<Word>().apply {
-            addAll(activeDeck?.words ?: emptyList())
-        }
+    LaunchedEffect(activeDeck) {
+        val words = activeDeck?.words ?: emptyList()
+        learningViewModel.initSession(words, userProgress.streak)
     }
 
-    var currentIndex by remember { mutableStateOf(0) }
-    
-    // Tiến độ học 4 giai đoạn cho từ hiện tại:
-    // 1: Flashcard, 2: Trắc nghiệm, 3: Gõ từ, 4: Đánh giá SM-2
-    var currentStep by remember { mutableStateOf(1) }
-    
-    // Trạng thái cho Bước 1: Flashcard
-    var isFlipped by remember(currentIndex) { mutableStateOf(false) }
+    val studyWords by learningViewModel.studyWords.collectAsState()
+    val currentIndex by learningViewModel.currentIndex.collectAsState()
+    val currentStep by learningViewModel.currentStep.collectAsState()
+    val isFlipped by learningViewModel.isFlipped.collectAsState()
+    val selectedOptionIndex by learningViewModel.selectedOptionIndex.collectAsState()
+    val isMcAnswerChecked by learningViewModel.isMcAnswerChecked.collectAsState()
+    val mcAttemptCount by learningViewModel.mcAttemptCount.collectAsState()
+    val isMcFirstTimeWrong by learningViewModel.isMcFirstTimeWrong.collectAsState()
+    val mcSelectedWrongOptions by learningViewModel.mcSelectedWrongOptions.collectAsState()
+    val typingInput by learningViewModel.typingInput.collectAsState()
+    val isTypingChecked by learningViewModel.isTypingChecked.collectAsState()
+    val isTypingCorrect by learningViewModel.isTypingCorrect.collectAsState()
+    val showTypingHint by learningViewModel.showTypingHint.collectAsState()
+    val showSm2ForCurrentWord by learningViewModel.showSm2ForCurrentWord.collectAsState()
+
     val rotation by animateFloatAsState(
         targetValue = if (isFlipped) 180f else 0f,
         animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
         label = "FlashcardFlip"
     )
 
-    // Trạng thái cho Bước 2: Trắc nghiệm
-    var selectedOptionIndex by remember(currentIndex) { mutableStateOf<Int?>(null) }
-    var isMcAnswerChecked by remember(currentIndex) { mutableStateOf(false) }
-    var mcAttemptCount by remember(currentIndex) { mutableStateOf(0) }
-    var isMcFirstTimeWrong by remember(currentIndex) { mutableStateOf(false) }
-    val mcSelectedWrongOptions = remember(currentIndex) { mutableStateListOf<Int>() }
-
-    // Trạng thái cho Bước 3: Gõ từ
-    var typingInput by remember(currentIndex) { mutableStateOf("") }
-    var isTypingChecked by remember(currentIndex) { mutableStateOf(false) }
-    var isTypingCorrect by remember(currentIndex) { mutableStateOf(false) }
-    var showTypingHint by remember(currentIndex) { mutableStateOf(false) }
-    
-    // Trạng thái hiển thị đánh giá SM-2 cho từ hiện tại
-    var showSm2ForCurrentWord by remember(currentIndex) { mutableStateOf(false) }
+    if (studyWords.isEmpty() && activeDeck?.words?.isNotEmpty() == true) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
 
     // Khi hoàn thành học tất cả các từ trong Deck
-    if (studyWords.isEmpty() || currentIndex >= studyWords.size) {
+    if (studyWords.isNotEmpty() && currentIndex >= studyWords.size) {
         LaunchedEffect(Unit) {
             onNavigate(Screen.LessonComplete)
         }
@@ -296,26 +294,7 @@ fun FlashcardScreen(
                                 val optHard = sm2Options[1]
                                 Card(
                                     onClick = {
-                                        onSubmitReview(currentWord.id, "again")
-                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optAgain.score)
-                                        currentWord.repetitions = res.first
-                                        currentWord.easeFactor = res.second
-                                        currentWord.intervalDays = res.third
-                                        
-                                        studyWords.add(currentWord.copy())
-                                        
-                                        isFlipped = false
-                                        currentStep = 1
-                                        currentIndex++
-                                        typingInput = ""
-                                        isTypingChecked = false
-                                        showTypingHint = false
-                                        selectedOptionIndex = null
-                                        isMcAnswerChecked = false
-                                        mcAttemptCount = 0
-                                        mcSelectedWrongOptions.clear()
-                                        isMcFirstTimeWrong = false
-                                        showSm2ForCurrentWord = false
+                                        learningViewModel.handleSm2Score(optAgain.score, onSubmitReview)
                                     },
                                     colors = CardDefaults.cardColors(containerColor = optAgain.color.copy(alpha = 0.08f)),
                                     border = BorderStroke(1.dp, optAgain.color),
@@ -329,24 +308,7 @@ fun FlashcardScreen(
 
                                 Card(
                                     onClick = {
-                                        onSubmitReview(currentWord.id, "hard")
-                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optHard.score)
-                                        currentWord.repetitions = res.first
-                                        currentWord.easeFactor = res.second
-                                        currentWord.intervalDays = res.third
-                                        
-                                        isFlipped = false
-                                        currentStep = 1
-                                        currentIndex++
-                                        typingInput = ""
-                                        isTypingChecked = false
-                                        showTypingHint = false
-                                        selectedOptionIndex = null
-                                        isMcAnswerChecked = false
-                                        mcAttemptCount = 0
-                                        mcSelectedWrongOptions.clear()
-                                        isMcFirstTimeWrong = false
-                                        showSm2ForCurrentWord = false
+                                        learningViewModel.handleSm2Score(optHard.score, onSubmitReview)
                                     },
                                     colors = CardDefaults.cardColors(containerColor = optHard.color.copy(alpha = 0.08f)),
                                     border = BorderStroke(1.dp, optHard.color),
@@ -367,24 +329,7 @@ fun FlashcardScreen(
                                 val optEasy = sm2Options[3]
                                 Card(
                                     onClick = {
-                                        onSubmitReview(currentWord.id, "good")
-                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optGood.score)
-                                        currentWord.repetitions = res.first
-                                        currentWord.easeFactor = res.second
-                                        currentWord.intervalDays = res.third
-                                        
-                                        isFlipped = false
-                                        currentStep = 1
-                                        currentIndex++
-                                        typingInput = ""
-                                        isTypingChecked = false
-                                        showTypingHint = false
-                                        selectedOptionIndex = null
-                                        isMcAnswerChecked = false
-                                        mcAttemptCount = 0
-                                        mcSelectedWrongOptions.clear()
-                                        isMcFirstTimeWrong = false
-                                        showSm2ForCurrentWord = false
+                                        learningViewModel.handleSm2Score(optGood.score, onSubmitReview)
                                     },
                                     colors = CardDefaults.cardColors(containerColor = optGood.color.copy(alpha = 0.08f)),
                                     border = BorderStroke(1.dp, optGood.color),
@@ -398,24 +343,7 @@ fun FlashcardScreen(
 
                                 Card(
                                     onClick = {
-                                        onSubmitReview(currentWord.id, "easy")
-                                        val res = Sm2Engine.calculate(currentWord.repetitions, currentWord.easeFactor, currentWord.intervalDays, optEasy.score)
-                                        currentWord.repetitions = res.first
-                                        currentWord.easeFactor = res.second
-                                        currentWord.intervalDays = res.third
-                                        
-                                        isFlipped = false
-                                        currentStep = 1
-                                        currentIndex++
-                                        typingInput = ""
-                                        isTypingChecked = false
-                                        showTypingHint = false
-                                        selectedOptionIndex = null
-                                        isMcAnswerChecked = false
-                                        mcAttemptCount = 0
-                                        mcSelectedWrongOptions.clear()
-                                        isMcFirstTimeWrong = false
-                                        showSm2ForCurrentWord = false
+                                        learningViewModel.handleSm2Score(optEasy.score, onSubmitReview)
                                     },
                                     colors = CardDefaults.cardColors(containerColor = optEasy.color.copy(alpha = 0.08f)),
                                     border = BorderStroke(1.dp, optEasy.color),
@@ -436,7 +364,7 @@ fun FlashcardScreen(
                     // ------------------------------------------
                     1 -> {
                         Card(
-                            onClick = { isFlipped = !isFlipped },
+                            onClick = { learningViewModel.flipCard() },
                             shape = RoundedCornerShape(24.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
@@ -736,22 +664,7 @@ fun FlashcardScreen(
 
                                         Card(
                                             onClick = {
-                                                if (!isMcAnswerChecked) {
-                                                    selectedOptionIndex = optIndex
-                                                    val isCorrect = optionText == currentWord.meaning
-                                                    
-                                                    if (isCorrect) {
-                                                        isMcAnswerChecked = true
-                                                    } else {
-                                                        mcAttemptCount++
-                                                        mcSelectedWrongOptions.add(optIndex)
-                                                        if (mcAttemptCount == 1) {
-                                                            isMcFirstTimeWrong = true
-                                                        } else {
-                                                            isMcAnswerChecked = true
-                                                        }
-                                                    }
-                                                }
+                                                learningViewModel.selectMcOption(optIndex, optionText == currentWord.meaning)
                                             },
                                             shape = RoundedCornerShape(12.dp),
                                             colors = CardDefaults.cardColors(containerColor = cardColor),
@@ -846,7 +759,7 @@ fun FlashcardScreen(
                                 // Ô Nhập từ
                                 OutlinedTextField(
                                     value = typingInput,
-                                    onValueChange = { if (!isTypingChecked) typingInput = it },
+                                    onValueChange = { learningViewModel.setTypingInput(it) },
                                     placeholder = { Text("Gõ từ tiếng Anh...".translated(userProgress.appLanguage)) },
                                     singleLine = true,
                                     enabled = !isTypingChecked,
@@ -858,8 +771,7 @@ fun FlashcardScreen(
                                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                                     keyboardActions = KeyboardActions(onDone = {
                                         if (typingInput.isNotBlank() && !isTypingChecked) {
-                                            isTypingChecked = true
-                                            isTypingCorrect = typingInput.trim().lowercase() == currentWord.word.lowercase()
+                                            learningViewModel.checkTyping(currentWord.word)
                                             focusManager.clearFocus()
                                         }
                                     }),
@@ -898,7 +810,7 @@ fun FlashcardScreen(
                                     ) {
                                         // Nút gợi ý (💡)
                                         OutlinedIconButton(
-                                            onClick = { showTypingHint = !showTypingHint },
+                                            onClick = { learningViewModel.toggleTypingHint() },
                                             shape = RoundedCornerShape(12.dp),
                                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                                             modifier = Modifier.size(48.dp)
@@ -915,8 +827,7 @@ fun FlashcardScreen(
                                         Button(
                                             onClick = {
                                                 if (typingInput.isNotBlank()) {
-                                                    isTypingChecked = true
-                                                    isTypingCorrect = typingInput.trim().lowercase() == currentWord.word.lowercase()
+                                                    learningViewModel.checkTyping(currentWord.word)
                                                     focusManager.clearFocus()
                                                 }
                                             },
@@ -950,7 +861,7 @@ fun FlashcardScreen(
                 } else if (currentStep == 1) {
                     if (!isFlipped) {
                         Button(
-                            onClick = { isFlipped = true },
+                            onClick = { learningViewModel.flipCard() },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
@@ -965,7 +876,7 @@ fun FlashcardScreen(
                         ) {
                             OutlinedButton(
                                 onClick = {
-                                    showSm2ForCurrentWord = true
+                                    learningViewModel.showSm2Rating()
                                 },
                                 shape = RoundedCornerShape(14.dp),
                                 border = BorderStroke(1.dp, Color(0xFF10B981)),
@@ -983,7 +894,7 @@ fun FlashcardScreen(
 
                             Button(
                                 onClick = {
-                                    currentStep = 2 // Chuyển qua Trắc nghiệm
+                                    learningViewModel.setStep(2) // Chuyển qua Trắc nghiệm
                                 },
                                 shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
@@ -1009,7 +920,7 @@ fun FlashcardScreen(
                         ) {
                             OutlinedButton(
                                 onClick = {
-                                    showSm2ForCurrentWord = true
+                                    learningViewModel.showSm2Rating()
                                 },
                                 shape = RoundedCornerShape(14.dp),
                                 border = BorderStroke(1.dp, Color(0xFF10B981)),
@@ -1027,7 +938,7 @@ fun FlashcardScreen(
 
                             Button(
                                 onClick = {
-                                    currentStep = 3 // Chuyển qua Viết từ
+                                    learningViewModel.setStep(3) // Chuyển qua Viết từ
                                 },
                                 shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
@@ -1054,7 +965,7 @@ fun FlashcardScreen(
                         ) {
                             OutlinedButton(
                                 onClick = {
-                                    showSm2ForCurrentWord = true
+                                    learningViewModel.showSm2Rating()
                                 },
                                 shape = RoundedCornerShape(14.dp),
                                 border = BorderStroke(1.dp, Color(0xFF10B981)),
@@ -1072,18 +983,7 @@ fun FlashcardScreen(
 
                             Button(
                                 onClick = {
-                                    // Quay lại Flashcard (Step 1) và reset states của từ hiện tại
-                                    isFlipped = false
-                                    selectedOptionIndex = null
-                                    isMcAnswerChecked = false
-                                    mcAttemptCount = 0
-                                    mcSelectedWrongOptions.clear()
-                                    isMcFirstTimeWrong = false
-                                    typingInput = ""
-                                    isTypingChecked = false
-                                    isTypingCorrect = false
-                                    showTypingHint = false
-                                    currentStep = 1
+                                    learningViewModel.resetWordStepStates()
                                 },
                                 shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),

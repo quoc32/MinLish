@@ -26,7 +26,9 @@ import com.example.minlishapp.data.DashboardData
 import com.example.minlishapp.data.ProfileStats
 import com.example.minlishapp.data.DonutChartData
 import com.example.minlishapp.data.BarChartData
-import com.example.minlishapp.data.repository.StatsRepository
+import com.example.minlishapp.ui.viewmodel.StatsViewModel
+import com.example.minlishapp.ui.viewmodel.StatsUiState
+import androidx.compose.runtime.collectAsState
 import com.example.minlishapp.ui.screens.Screen
 import com.example.minlishapp.ui.screens.AppBottomBar
 import com.example.minlishapp.ui.theme.ColorStreakFlame
@@ -34,50 +36,29 @@ import com.example.minlishapp.ui.theme.ColorEasy
 import com.example.minlishapp.ui.theme.ColorGood
 import com.example.minlishapp.ui.theme.ColorAgain
 import com.example.minlishapp.ui.theme.MinLishAppTheme
-import kotlinx.coroutines.launch
 import com.example.minlishapp.core.utils.translated
 
-// Interface definition for UI states
-sealed interface StatsUiState {
-    object Loading : StatsUiState
-    data class Success(val data: DashboardData) : StatsUiState
-    data class Error(val message: String) : StatsUiState
-}
-
 @Composable
-fun StatsScreen(userId: String, appLanguage: String, onNavigate: (Screen) -> Unit) {
-    val statsRepository = remember { StatsRepository.create() }
-    var uiState by remember { mutableStateOf<StatsUiState>(StatsUiState.Loading) }
-    val coroutineScope = rememberCoroutineScope()
-
+fun StatsScreen(
+    statsViewModel: StatsViewModel,
+    userId: String,
+    appLanguage: String,
+    onNavigate: (Screen) -> Unit
+) {
     // Use passed userId, fallback to default test user ID if empty
     val activeUserId = if (userId.isBlank()) "b64361ca-719d-4a07-b50f-910d8e05f9da" else userId
 
-    fun fetchStats() {
-        coroutineScope.launch {
-            uiState = StatsUiState.Loading
-            try {
-                val response = statsRepository.getStatsDashboard(activeUserId)
-                if (response.success && response.data != null) {
-                    uiState = StatsUiState.Success(response.data)
-                } else {
-                    uiState = StatsUiState.Error(response.message ?: "Không thể tải dữ liệu thống kê")
-                }
-            } catch (e: Exception) {
-                uiState = StatsUiState.Error("Lỗi kết nối: ${e.localizedMessage ?: "Không thể kết nối đến máy chủ"}")
-            }
-        }
-    }
+    val uiState by statsViewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        fetchStats()
+    LaunchedEffect(activeUserId) {
+        statsViewModel.fetchStats(activeUserId)
     }
 
     StatsScreenContent(
         uiState = uiState,
         appLanguage = appLanguage,
         onNavigate = onNavigate,
-        onRetry = { fetchStats() }
+        onRetry = { statsViewModel.fetchStats(activeUserId) }
     )
 }
 
