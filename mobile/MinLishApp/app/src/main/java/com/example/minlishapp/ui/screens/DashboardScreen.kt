@@ -21,8 +21,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.minlishapp.data.Deck
 import com.example.minlishapp.data.DailyPlanData
 import com.example.minlishapp.data.UserProgress
@@ -49,8 +51,8 @@ fun DashboardScreen(
         decks
     }
 
-    var selectedDeck by remember(filteredDecks) {
-        mutableStateOf<Deck?>(activeDeck?.takeIf { ad -> filteredDecks.any { it.id == ad.id } } ?: filteredDecks.firstOrNull())
+    var selectedDeck by remember {
+        mutableStateOf<Deck?>(null)
     }
 
     Scaffold(
@@ -63,11 +65,11 @@ fun DashboardScreen(
                 .padding(innerPadding)
         ) {
             val isSmallScreen = maxHeight < 640.dp
-            val listBottomPadding = if (isSmallScreen) 110.dp else 140.dp
 
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
+                // ... (Top Header remains same)
                 // Top Header: Chỉ số tổng quan & Theme Switcher
                 Card(
                     colors = CardDefaults.cardColors(
@@ -153,7 +155,7 @@ fun DashboardScreen(
                         .weight(1f)
                         .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    contentPadding = PaddingValues(top = 24.dp, bottom = listBottomPadding) // Chừa chỗ cho card nổi
+                    contentPadding = PaddingValues(top = 24.dp, bottom = 32.dp)
                 ) {
                     // Daily Learning Plan Card
                     if (dailyPlan != null || isLoading) {
@@ -332,75 +334,90 @@ fun DashboardScreen(
                 }
             }
 
-            // Card "Vào học" hiển thị thông tin chủ đề được chọn (nổi ở dưới màn hình)
+            // Dialog "Vào học" hiển thị thông tin chủ đề được chọn khi click vào node
             selectedDeck?.let { deck ->
-                val cardPaddingHorizontal = if (isSmallScreen) 12.dp else 20.dp
-                val cardPaddingVertical = if (isSmallScreen) 8.dp else 16.dp
-                val contentPadding = if (isSmallScreen) 12.dp else 16.dp
-                val buttonHeight = if (isSmallScreen) 38.dp else 46.dp
+                val contentPadding = if (isSmallScreen) 16.dp else 24.dp
+                val buttonHeight = if (isSmallScreen) 42.dp else 48.dp
 
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(horizontal = cardPaddingHorizontal, vertical = cardPaddingVertical)
-                ) {
+                Dialog(onDismissRequest = { selectedDeck = null }) {
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         ),
-                        shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                        shape = RoundedCornerShape(24.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
                     ) {
                         Column(
                             modifier = Modifier.padding(contentPadding),
-                            verticalArrangement = Arrangement.spacedBy(if (isSmallScreen) 4.dp else 8.dp)
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // Tag
-                            val tagText = deck.tags.firstOrNull() ?: "CHỦ ĐỀ"
+                            // Icon chủ đề lớn trong popup
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(100.dp))
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    .size(80.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = tagText,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    text = when (deck.name.lowercase()) {
+                                        "conferences" -> "💼"
+                                        "marketing" -> "📈"
+                                        "contracts" -> "📜"
+                                        "academic core" -> "🎓"
+                                        "science & tech" -> "🔬"
+                                        "hotels & stays" -> "🏨"
+                                        else -> "📚"
+                                    },
+                                    fontSize = 40.sp
                                 )
                             }
 
-                            // Title
-                            Text(
-                                text = deck.name,
-                                fontSize = if (isSmallScreen) 16.sp else 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                // Tag
+                                val tagText = deck.tags.firstOrNull() ?: "CHỦ ĐỀ"
+                                Text(
+                                    text = tagText.uppercase(),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 1.sp
+                                )
+                                
+                                Spacer(modifier = Modifier.height(4.dp))
 
-                            // Subtitle
-                            Text(
-                                text = "${deck.wordCount} " + "từ".translated(userProgress.appLanguage),
-                                fontSize = if (isSmallScreen) 12.sp else 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                                // Title
+                                Text(
+                                    text = deck.name,
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
+                                )
 
-                            Spacer(modifier = Modifier.height(if (isSmallScreen) 2.dp else 4.dp))
+                                // Subtitle
+                                Text(
+                                    text = "${deck.wordCount} " + "từ vựng".translated(userProgress.appLanguage),
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
 
                             // Nút Vào học bo viền xanh lá chuẩn thiết kế
                             val buttonColor = Color(0xFF10B981)
-                            OutlinedButton(
+                            Button(
                                 onClick = {
                                     onStartStudy(deck)
+                                    selectedDeck = null
                                 },
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, buttonColor),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = buttonColor
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = buttonColor
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -411,17 +428,27 @@ fun DashboardScreen(
                                     horizontalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.ChevronRight,
+                                        imageVector = Icons.Default.PlayArrow,
                                         contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Vào học".translated(userProgress.appLanguage),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
+                                        text = "VÀO HỌC".translated(userProgress.appLanguage),
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 16.sp
                                     )
                                 }
+                            }
+                            
+                            TextButton(
+                                onClick = { selectedDeck = null },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "Đóng".translated(userProgress.appLanguage),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     }
