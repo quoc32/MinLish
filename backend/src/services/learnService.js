@@ -125,8 +125,36 @@ async function getDailyPlan(userId) {
     }
   });
 
-  // 6. Limit new cards to user's wordsPerDay setting
-  const newCards = allNewCards.slice(0, wordsPerDay);
+  // 6. Limit new cards to user's remaining wordsPerDay limit
+  const todayStr = new Date().toISOString().split('T')[0];
+  const { data: activityRecord } = await supabase
+    .from('study_activity')
+    .select('card_ids')
+    .eq('user_id', userId)
+    .eq('date', todayStr)
+    .maybeSingle();
+
+  const todayCardIds = activityRecord && activityRecord.card_ids ? activityRecord.card_ids : [];
+  let newWordsStudiedTodayCount = 0;
+
+  if (todayCardIds.length > 0) {
+    const { data: todayProgress } = await supabase
+      .from('word_progress')
+      .select('card_id, repetitions')
+      .eq('user_id', userId)
+      .in('card_id', todayCardIds);
+
+    if (todayProgress) {
+      todayProgress.forEach(progress => {
+        if (progress.repetitions === 1) {
+          newWordsStudiedTodayCount++;
+        }
+      });
+    }
+  }
+
+  const remainingNewWordsLimit = Math.max(0, wordsPerDay - newWordsStudiedTodayCount);
+  const newCards = allNewCards.slice(0, remainingNewWordsLimit);
 
   return {
     wordsPerDay,

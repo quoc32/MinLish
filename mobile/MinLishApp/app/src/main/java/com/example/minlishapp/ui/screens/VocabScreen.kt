@@ -423,15 +423,18 @@ fun DeckItem(
             .fillMaxWidth()
             .offset(x = alignmentBias.dp)
     ) {
+        val isDark = MaterialTheme.colorScheme.background == Color(0xFF090A0F)
         val isCompleted = deck.progress >= 1.0f
+        val completedBg = if (isDark) Color(0xFF064E3B) else Color(0xFFDCFCE7)
+        val completedBorder = if (isDark) Color(0xFF059669) else Color(0xFF10B981)
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = if (isCompleted) Color(0xFFDCFCE7) else MaterialTheme.colorScheme.surface
+                containerColor = if (isCompleted) completedBg else MaterialTheme.colorScheme.surface
             ),
             shape = RoundedCornerShape(16.dp),
             border = BorderStroke(
                 1.dp,
-                if (isCompleted) Color(0xFF10B981) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                if (isCompleted) completedBorder else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
             ),
             modifier = Modifier
                 .width(280.dp)

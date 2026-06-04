@@ -139,6 +139,7 @@ fun ResetPasswordScreen(
                         authViewModel.resetPassword(password) { success, msg ->
                             if (success) {
                                 Toast.makeText(context, "Đổi mật khẩu thành công! Vui lòng đăng nhập lại.".translated(appLanguage), Toast.LENGTH_LONG).show()
+                                authViewModel.setShowForgotPasswordDialog(false)
                                 onNavigate(Screen.Login)
                             }
                         }
@@ -168,6 +169,7 @@ fun ResetPasswordScreen(
             TextButton(
                 onClick = {
                     tokenManager.clearToken()
+                    authViewModel.setShowForgotPasswordDialog(false)
                     onNavigate(Screen.Login)
                 }
             ) {

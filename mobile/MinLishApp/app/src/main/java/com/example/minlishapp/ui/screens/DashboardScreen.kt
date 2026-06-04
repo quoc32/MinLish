@@ -193,6 +193,37 @@ fun DashboardScreen(
                                             color = MaterialTheme.colorScheme.onPrimaryContainer
                                         )
 
+                                        if (dailyPlan.totalNewCardsAvailable < userProgress.wordsPerDay) {
+                                            Surface(
+                                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "⚠️ " + "Kho từ vựng mới sắp hết!".translated(userProgress.appLanguage),
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 12.sp,
+                                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                                    )
+                                                    val msg = if (dailyPlan.totalNewCardsAvailable == 0) {
+                                                        "Bạn đã học hết từ mới trong các bộ từ hiện tại. Hãy tạo hoặc tải thêm bộ từ vựng mới!".translated(userProgress.appLanguage)
+                                                    } else {
+                                                        "Số từ mới còn lại (${dailyPlan.totalNewCardsAvailable} từ) ít hơn mục tiêu hàng ngày (${userProgress.wordsPerDay} từ) của bạn. Nên chuyển mục tiêu học thành ${dailyPlan.totalNewCardsAvailable} từ/ngày hoặc bổ sung thêm từ vựng mới.".translated(userProgress.appLanguage)
+                                                    }
+                                                    Text(
+                                                        text = msg,
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.9f),
+                                                        lineHeight = 15.sp
+                                                    )
+                                                }
+                                            }
+                                        }
+
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceEvenly
@@ -206,7 +237,7 @@ fun DashboardScreen(
                                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                                 )
                                                 Text(
-                                                    text = "từ mới".translated(userProgress.appLanguage),
+                                                    text = "Từ mới".translated(userProgress.appLanguage),
                                                     fontSize = 11.sp,
                                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                                 )
@@ -220,7 +251,7 @@ fun DashboardScreen(
                                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                                 )
                                                 Text(
-                                                    text = "Đang ôn".translated(userProgress.appLanguage),
+                                                    text = "Cần ôn".translated(userProgress.appLanguage),
                                                     fontSize = 11.sp,
                                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                                 )
@@ -235,7 +266,7 @@ fun DashboardScreen(
                                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                                     )
                                                     Text(
-                                                        text = "Đang ôn".translated(userProgress.appLanguage),
+                                                        text = "Học lại".translated(userProgress.appLanguage),
                                                         fontSize = 11.sp,
                                                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                                                     )
