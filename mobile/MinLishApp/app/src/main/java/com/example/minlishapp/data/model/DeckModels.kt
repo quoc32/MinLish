@@ -30,30 +30,41 @@ data class CreateDeckResponse(
     val data: DeckApiItem?
 )
 
-data class DeckExportJson(
-    val export_date: String,
-    val app_version: String,
-    val format_version: String,
-    val data: DeckExportData
+// Response wrapper from GET /api/import-export/export/:deckId
+data class DeckExportResponse(
+    val success: Boolean,
+    val data: DeckExportPayload?
 )
 
-data class DeckExportData(
-    val id: String,
+// The actual export payload inside { data: ... }
+data class DeckExportPayload(
+    val deck: DeckExportDeckInfo,
+    val cards: List<CardExportData>
+)
+
+data class DeckExportDeckInfo(
     val name: String,
+    val icon: String?,
     val tag: String?,
+    @com.google.gson.annotations.SerializedName("target_goal") val targetGoal: Int?
+)
+
+// Used for writing the export file (what we actually save to disk)
+data class DeckExportJson(
+    val deck: DeckExportDeckInfo,
     val cards: List<CardExportData>
 )
 
 data class CardExportData(
-    val word: String,
-    val pronunciation: String,
-    val meaning: String,
-    @com.google.gson.annotations.SerializedName("description_en") val descriptionEn: String?,
-    val example: String?,
-    @com.google.gson.annotations.SerializedName("word_type") val wordType: String?,
-    val collocation: String?,
-    @com.google.gson.annotations.SerializedName("related_words") val relatedWords: String?,
-    val note: String?
+    val word: String = "",
+    val pronunciation: String = "",
+    val meaning: String = "",
+    @com.google.gson.annotations.SerializedName("description_en") val descriptionEn: String? = null,
+    val example: String? = null,
+    @com.google.gson.annotations.SerializedName("word_type") val wordType: String? = null,
+    val collocation: String? = null,
+    @com.google.gson.annotations.SerializedName("related_words") val relatedWords: String? = null,
+    val note: String? = null
 )
 
 data class ImportDeckResponse(

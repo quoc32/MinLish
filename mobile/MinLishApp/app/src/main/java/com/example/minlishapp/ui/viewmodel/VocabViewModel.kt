@@ -227,7 +227,17 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val response = deckRepository.exportDeck(deckId)
                 if (response.isSuccessful && response.body() != null) {
-                    onResult(true, response.body())
+                    val apiResponse = response.body()!!
+                    if (apiResponse.success && apiResponse.data != null) {
+                        val payload = apiResponse.data
+                        val exportJson = DeckExportJson(
+                            deck = payload.deck,
+                            cards = payload.cards
+                        )
+                        onResult(true, exportJson)
+                    } else {
+                        onResult(false, null)
+                    }
                 } else {
                     onResult(false, null)
                 }
