@@ -217,7 +217,18 @@ object LanguageHelper {
         "Đánh giá khả năng nhớ từ của bạn" to "Evaluate your retention of the word",
         "Đã học" to "Learned",
         "Ôn tập" to "Review",
-        "Gợi ý: Nhấn 'Đã thuộc' hoặc 'Học tiếp' để bắt đầu luyện tập" to "Hint: Tap 'Mastered' or 'Learn More' to start practicing"
+        "Gợi ý: Nhấn 'Đã thuộc' hoặc 'Học tiếp' để bắt đầu luyện tập" to "Hint: Tap 'Mastered' or 'Learn More' to start practicing",
+
+        // AI Smart Tutor Screen
+        "AI Smart Tutor" to "AI Smart Tutor",
+        "MinLish Learning Partner" to "MinLish Learning Partner",
+        "Quay lại" to "Back",
+        "Xóa lịch sử chat" to "Clear chat history",
+        "✨ Xin chào! Mình là Gia sư AI MinLish" to "✨ Hello! I am your MinLish AI Tutor",
+        "Mình có thể hỗ trợ bạn:\n• Tra nghĩa của từ mới 📖\n• Giải thích các điểm ngữ pháp phức tạp ✍️\n• Lấy ví dụ minh họa và từ đồng nghĩa 💡\n• Tự động tạo flashcard học từ vựng!" to "I can help you with:\n• Translate & define new words 📖\n• Explain complex grammar points ✍️\n• Provide examples and synonyms 💡\n• Automatically create vocabulary flashcards!",
+        "Đang suy luận..." to "Thinking...",
+        "Nhập tin nhắn..." to "Type a message...",
+        "Gửi" to "Send"
     )
 
     fun translate(text: String, appLanguage: String): String {

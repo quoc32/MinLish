@@ -1,0 +1,69 @@
+# REST Client Requests for MinLish AI Tutor API
+# Bạn có thể sử dụng file này bằng Extension "REST Client" trong VS Code để gửi request trực tiếp.
+
+@baseUrl = http://localhost:8000
+@userUuid = 2552f5d5-9e74-4313-9969-13666637c179
+
+### 1. Kiểm tra Trạng thái Hoạt động (Health Check)
+GET {{baseUrl}}/health
+
+### 2. Trò chuyện Xã giao (General Chat)
+POST {{baseUrl}}/api/tutor/chat
+Content-Type: application/json
+
+{
+  "user_id": "{{userUuid}}",
+  "message": "smartphone có nghĩa là gì ?",
+  "target_goal": "IELTS"
+}
+
+### 3. Hỏi định nghĩa từ vựng mới (explain_word - Luồng 1)
+# Bắt đầu luồng hỏi định nghĩa từ vựng, AI sẽ đặt ra thử thách đặt câu (awaiting_sentence = true)
+POST {{baseUrl}}/api/tutor/chat
+Content-Type: application/json
+
+{
+  "user_id": "{{userUuid}}",
+  "message": "application nghĩa là gì?",
+  "target_goal": "IELTS"
+}
+
+### 4. Đặt câu trả lời thử thách / Kiểm tra ngữ pháp (grammar_check - Luồng 3)
+# Chạy request này sau khi đã chạy Request số 3 ở trên để kiểm tra cơ chế giữ trạng thái (MemorySaver)
+POST {{baseUrl}}/api/tutor/chat
+Content-Type: application/json
+
+{
+  "user_id": "{{userUuid}}",
+  "message": "I has a smartphone.",
+  "target_goal": "IELTS"
+}
+
+### 5. Dán đoạn văn dài trích xuất từ vựng (extract_text - Luồng 2)
+POST {{baseUrl}}/api/tutor/chat
+Content-Type: application/json
+
+{
+  "user_id": "{{userUuid}}",
+  "message": "Incorporating the smartphone into academic environments can facilitate learning, but teachers must establish clear guidelines to mitigate potential distractions. Trích xuất từ vựng giúp mình.",
+  "target_goal": "IELTS"
+}
+
+### 6. Xác nhận đồng ý lưu từ vựng (save_word - Luồng 5)
+# Gửi tin nhắn đồng ý lưu từ sau khi đã nhận được phản hồi gợi ý lưu ở bước trên
+POST {{baseUrl}}/api/tutor/chat
+Content-Type: application/json
+
+{
+  "user_id": "{{userUuid}}",
+  "message": "Lưu vào Từ vựng cá nhân",
+  "target_goal": "IELTS"
+}
+
+### 7. Reset toàn bộ lịch sử trò chuyện & trạng thái (Reset State)
+POST {{baseUrl}}/api/tutor/reset
+Content-Type: application/json
+
+{
+  "user_id": "{{userUuid}}"
+}

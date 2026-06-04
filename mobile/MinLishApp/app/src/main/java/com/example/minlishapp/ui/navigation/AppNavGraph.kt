@@ -26,7 +26,8 @@ fun AppNavGraph(
     authViewModel: AuthViewModel,
     statsViewModel: StatsViewModel,
     learningViewModel: LearningViewModel,
-    profileViewModel: ProfileViewModel
+    profileViewModel: ProfileViewModel,
+    tutorViewModel: TutorViewModel
 ) {
     val context = LocalContext.current
 
@@ -248,6 +249,14 @@ fun AppNavGraph(
                 authViewModel = authViewModel,
                 navController = navController,
                 appLanguage = userProgress.appLanguage
+            )
+        }
+
+        composable(AppRoute.AiTutor.route) {
+            TutorChatScreen(
+                tutorViewModel = tutorViewModel,
+                userProgress = userProgress,
+                navController = navController
             )
         }
     }

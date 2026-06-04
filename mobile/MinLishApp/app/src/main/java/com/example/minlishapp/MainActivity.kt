@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
             val statsViewModel: StatsViewModel = viewModel()
             val learningViewModel: LearningViewModel = viewModel()
             val profileViewModel: ProfileViewModel = viewModel()
+            val tutorViewModel: TutorViewModel = viewModel()
 
             // ============================================================
             // SCREEN ROUTING WITH NAVIGATION COMPONENT
@@ -121,7 +122,8 @@ class MainActivity : ComponentActivity() {
                         authViewModel = authViewModel,
                         statsViewModel = statsViewModel,
                         learningViewModel = learningViewModel,
-                        profileViewModel = profileViewModel
+                        profileViewModel = profileViewModel,
+                        tutorViewModel = tutorViewModel
                     )
                 }
             }

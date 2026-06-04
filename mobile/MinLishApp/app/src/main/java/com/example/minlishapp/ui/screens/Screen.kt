@@ -14,6 +14,7 @@ sealed class AppRoute(val route: String) {
     object Stats : AppRoute("stats")
     object Profile : AppRoute("profile")
     object ResetPassword : AppRoute("reset_password")
+    object AiTutor : AppRoute("ai_tutor")
 
     companion object {
         /** Bottom bar screens */
