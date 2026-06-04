@@ -1354,6 +1354,7 @@ fun ExportDeckDialog(
     var exportFormat by remember { mutableStateOf("json") }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        onDismiss()
         uri?.let { destUri ->
             deckToExport?.let { deck ->
                 onExportDeck(deck.id) { success, exportJson ->
@@ -1375,6 +1376,7 @@ fun ExportDeckDialog(
     }
 
     val csvExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        onDismiss()
         uri?.let { destUri ->
             deckToExport?.let { deck ->
                 onExportDeckCsv(deck.id) { success, csvString ->
@@ -1450,7 +1452,6 @@ fun ExportDeckDialog(
                             } else {
                                 exportLauncher.launch("${deck.name}.json")
                             }
-                            onDismiss()
                         },
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
