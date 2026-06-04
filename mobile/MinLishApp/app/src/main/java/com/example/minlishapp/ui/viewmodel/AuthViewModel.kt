@@ -185,7 +185,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _isLoading.value = true
             _errorMessage.value = ""
             try {
-                val response = authRepository.resetPassword(ResetPasswordRequest(password))
+                val refreshToken = tokenManager.getRefreshToken() ?: ""
+                val response = authRepository.resetPassword(ResetPasswordRequest(password, refreshToken))
                 if (response.isSuccessful && response.body()?.success == true) {
                     tokenManager.clearToken()
                     onResult(true, "Đổi mật khẩu thành công! Vui lòng đăng nhập lại.")

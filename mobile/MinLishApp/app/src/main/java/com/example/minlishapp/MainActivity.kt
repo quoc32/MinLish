@@ -27,7 +27,7 @@ import android.os.Build
 import com.example.minlishapp.core.network.TokenManager
 
 class MainActivity : ComponentActivity() {
-    private var onTokenReceivedCallback: ((String) -> Unit)? = null
+    private var onTokenReceivedCallback: ((String, String) -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,8 +70,9 @@ class MainActivity : ComponentActivity() {
             // Setup deep link token receiver
             val tokenManager = remember { TokenManager.getInstance(context) }
             LaunchedEffect(Unit) {
-                onTokenReceivedCallback = { token ->
+                onTokenReceivedCallback = { token, refreshToken ->
                     tokenManager.saveToken(token)
+                    tokenManager.saveRefreshToken(refreshToken)
                     currentScreen = Screen.ResetPassword
                 }
                 handleIntent(intent)
@@ -299,26 +300,33 @@ class MainActivity : ComponentActivity() {
         val data: android.net.Uri? = intent?.data
         if (data != null && data.scheme == "minlish" && data.host == "reset-password") {
             var token: String? = null
+            var refreshToken: String? = null
             val fragment = data.fragment
             if (!fragment.isNullOrEmpty()) {
                 val params = fragment.split("&")
                 for (param in params) {
                     val pair = param.split("=")
-                    if (pair.size == 2 && pair[0] == "access_token") {
-                        token = pair[1]
-                        break
+                    if (pair.size == 2) {
+                        if (pair[0] == "access_token") {
+                            token = pair[1]
+                        } else if (pair[0] == "refresh_token") {
+                            refreshToken = pair[1]
+                        }
                     }
                 }
             }
             if (token == null) {
                 token = data.getQueryParameter("access_token")
             }
+            if (refreshToken == null) {
+                refreshToken = data.getQueryParameter("refresh_token")
+            }
 
-            if (!token.isNullOrEmpty()) {
-                Log.d("MainActivity", "Successfully extracted deep link access token.")
-                onTokenReceivedCallback?.invoke(token)
+            if (!token.isNullOrEmpty() && !refreshToken.isNullOrEmpty()) {
+                Log.d("MainActivity", "Successfully extracted deep link access token and refresh token.")
+                onTokenReceivedCallback?.invoke(token, refreshToken)
             } else {
-                Log.e("MainActivity", "Deep link matching reset-password but access_token is missing.")
+                Log.e("MainActivity", "Deep link matching reset-password but access_token or refresh_token is missing.")
             }
         }
     }

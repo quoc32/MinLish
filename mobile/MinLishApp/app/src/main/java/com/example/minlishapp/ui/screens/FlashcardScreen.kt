@@ -158,7 +158,7 @@ fun FlashcardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { onNavigate(Screen.Dashboard) }) {
+                IconButton(onClick = { onNavigate(Screen.VocabDecks) }) {
                     Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
                 }
 

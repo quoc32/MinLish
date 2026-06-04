@@ -178,7 +178,7 @@ async function forgotPassword(email) {
   return true;
 }
 
-async function resetPassword(token, newPassword) {
+async function resetPassword(token, refreshToken, newPassword) {
   const { createClient } = require('@supabase/supabase-js');
   const tempClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
     auth: {
@@ -189,7 +189,7 @@ async function resetPassword(token, newPassword) {
 
   const { error: sessionError } = await tempClient.auth.setSession({
     access_token: token,
-    refresh_token: ''
+    refresh_token: refreshToken
   });
 
   if (sessionError) {

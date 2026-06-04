@@ -67,7 +67,8 @@ data class ForgotPasswordRequest(
 )
 
 data class ResetPasswordRequest(
-    val password: String
+    val password: String,
+    @com.google.gson.annotations.SerializedName("refresh_token") val refreshToken: String
 )
 
 data class SimpleResponse(
