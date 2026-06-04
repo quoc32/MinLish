@@ -199,17 +199,25 @@ async function submitReview(userId, cardId, quality) {
     .maybeSingle();
 
   if (activityRecord) {
-    await supabase
-      .from('study_activity')
-      .update({ words_count: activityRecord.words_count + 1 })
-      .eq('id', activityRecord.id);
+    const currentCardIds = activityRecord.card_ids || [];
+    if (!currentCardIds.includes(cardId)) {
+      const updatedCardIds = [...currentCardIds, cardId];
+      await supabase
+        .from('study_activity')
+        .update({
+          words_count: activityRecord.words_count + 1,
+          card_ids: updatedCardIds
+        })
+        .eq('id', activityRecord.id);
+    }
   } else {
     await supabase
       .from('study_activity')
       .insert({
         user_id: userId,
         date: todayStr,
-        words_count: 1
+        words_count: 1,
+        card_ids: [cardId]
       });
   }
 
