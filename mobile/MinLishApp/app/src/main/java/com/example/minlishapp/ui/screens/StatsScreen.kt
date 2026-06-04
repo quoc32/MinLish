@@ -18,7 +18,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -173,6 +178,9 @@ fun StatsScreenContent(
 
                         val barColor = MaterialTheme.colorScheme.primary
                         val outlineColor = MaterialTheme.colorScheme.outline
+                        val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+                        val textMeasurer = rememberTextMeasurer()
+                        val density = LocalDensity.current
 
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -180,7 +188,7 @@ fun StatsScreenContent(
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(200.dp)
+                                .height(220.dp) // Tăng chiều cao một chút để đủ chỗ cho số liệu
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Canvas(
@@ -191,6 +199,7 @@ fun StatsScreenContent(
                                     val maxVal = (barData.maxOfOrNull { it.wordsCount } ?: 10).toFloat().coerceAtLeast(10f)
                                     val widthGap = size.width / (barData.size)
                                     val barWidth = 24.dp.toPx()
+                                    val labelFontSize = 10.sp
 
                                     // Vẽ đường tham chiếu phụ ngang ở giữa (50%)
                                     drawLine(
@@ -202,10 +211,10 @@ fun StatsScreenContent(
 
                                     barData.forEachIndexed { index, barItem ->
                                         val left = index * widthGap + (widthGap - barWidth) / 2
-                                        val barHeight = (barItem.wordsCount / maxVal) * size.height
+                                        val barHeight = (barItem.wordsCount / maxVal) * (size.height - 20.dp.toPx()) // Trừ bớt để chừa chỗ cho text
                                         val top = size.height - barHeight
 
-                                        // Chỉ vẽ khi cột có chiều cao
+                                        // Vẽ cột
                                         if (barHeight > 0f) {
                                             drawRoundRect(
                                                 color = barColor,
@@ -214,6 +223,24 @@ fun StatsScreenContent(
                                                 cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
                                             )
                                         }
+
+                                        // Vẽ số liệu trên đầu cột
+                                        val textResult = textMeasurer.measure(
+                                            text = "${barItem.wordsCount}",
+                                            style = TextStyle(
+                                                color = onSurfaceVariant,
+                                                fontSize = labelFontSize,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        )
+                                        
+                                        drawText(
+                                            textLayoutResult = textResult,
+                                            topLeft = Offset(
+                                                x = left + (barWidth - textResult.size.width) / 2,
+                                                y = top - textResult.size.height - 4.dp.toPx()
+                                            )
+                                        )
                                     }
                                 }
 
