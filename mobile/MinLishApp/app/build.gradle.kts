@@ -1,9 +1,9 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
-
-import java.util.Properties
 
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
@@ -79,4 +79,7 @@ dependencies {
 
     // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:21.0.0")
+
+    // Navigation
+    implementation(libs.androidx.navigation.compose)
 }

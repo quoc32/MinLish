@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import com.example.minlishapp.ui.theme.*
 import com.example.minlishapp.core.utils.translated
 import kotlin.math.cos
@@ -24,7 +25,7 @@ import kotlin.math.sin
 
 @Composable
 fun LessonCompleteScreen(
-    onNavigate: (Screen) -> Unit,
+    navController: NavHostController,
     xpGained: Int,
     streak: Int,
     accuracy: Int,
@@ -142,7 +143,7 @@ fun LessonCompleteScreen(
 
             // Nút Tiếp tục ở dưới cùng
             Button(
-                onClick = { onNavigate(Screen.Dashboard) },
+                onClick = { navController.navigate(AppRoute.Dashboard.route) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(if (isSmallScreen) 46.dp else 52.dp),

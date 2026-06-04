@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.navigation.NavHostController
 import com.example.minlishapp.data.Deck
 import com.example.minlishapp.data.DailyPlanData
 import com.example.minlishapp.data.UserProgress
@@ -38,7 +39,7 @@ fun DashboardScreen(
     userProgress: UserProgress,
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
-    onNavigate: (Screen) -> Unit,
+    navController: NavHostController,
     activeDeck: Deck?,
     onActiveDeckSelect: (Deck) -> Unit,
     decks: List<Deck>,
@@ -55,9 +56,7 @@ fun DashboardScreen(
         mutableStateOf<Deck?>(null)
     }
 
-    Scaffold(
-        bottomBar = { AppBottomBar(currentScreen = Screen.Dashboard, onNavigate = onNavigate, appLanguage = userProgress.appLanguage) }
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()

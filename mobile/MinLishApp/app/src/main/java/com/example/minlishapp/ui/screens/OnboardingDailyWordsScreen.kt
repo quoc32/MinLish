@@ -15,13 +15,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import com.example.minlishapp.data.UserProgress
 
 @Composable
 fun OnboardingDailyWordsScreen(
     userProgress: UserProgress,
     onProgressUpdate: (UserProgress) -> Unit,
-    onNavigate: (Screen) -> Unit
+    navController: NavHostController
 ) {
     var wordsPerDay by remember { mutableFloatStateOf(userProgress.wordsPerDay.toFloat()) }
 
@@ -45,7 +46,7 @@ fun OnboardingDailyWordsScreen(
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
                     IconButton(
-                        onClick = { onNavigate(Screen.OnboardingGoals) },
+                        onClick = { navController.navigate(AppRoute.OnboardingGoals.route) },
                         modifier = Modifier
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surface)
@@ -147,7 +148,7 @@ fun OnboardingDailyWordsScreen(
                             wordsPerDay = wordsPerDay.toInt()
                         )
                     )
-                    onNavigate(Screen.Dashboard)
+                    navController.navigate(AppRoute.Dashboard.route)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

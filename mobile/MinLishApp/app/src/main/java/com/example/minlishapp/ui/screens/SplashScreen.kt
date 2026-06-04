@@ -17,11 +17,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import com.example.minlishapp.R
 import kotlinx.coroutines.delay
 
 @Composable
-fun SplashScreen(onNavigate: (Screen) -> Unit) {
+fun SplashScreen(navController: NavHostController) {
     val quotes = listOf(
         "Lặp lại ngắt quãng giúp tăng tỷ lệ ghi nhớ lên tới 80%.",
         "Học 15 phút mỗi ngày hiệu quả hơn học 2 tiếng cuối tuần.",
@@ -32,7 +33,9 @@ fun SplashScreen(onNavigate: (Screen) -> Unit) {
 
     LaunchedEffect(Unit) {
         delay(2200)
-        onNavigate(Screen.Welcome)
+        navController.navigate(AppRoute.Welcome.route) {
+            popUpTo(AppRoute.Splash.route) { inclusive = true }
+        }
     }
 
     Box(

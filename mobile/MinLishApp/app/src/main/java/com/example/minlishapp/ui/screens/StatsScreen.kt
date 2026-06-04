@@ -34,8 +34,7 @@ import com.example.minlishapp.data.BarChartData
 import com.example.minlishapp.ui.viewmodel.StatsViewModel
 import com.example.minlishapp.ui.viewmodel.StatsUiState
 import androidx.compose.runtime.collectAsState
-import com.example.minlishapp.ui.screens.Screen
-import com.example.minlishapp.ui.screens.AppBottomBar
+import androidx.navigation.NavHostController
 import com.example.minlishapp.ui.theme.ColorStreakFlame
 import com.example.minlishapp.ui.theme.ColorEasy
 import com.example.minlishapp.ui.theme.ColorGood
@@ -48,7 +47,7 @@ fun StatsScreen(
     statsViewModel: StatsViewModel,
     userId: String,
     appLanguage: String,
-    onNavigate: (Screen) -> Unit
+    navController: NavHostController
 ) {
     // Use passed userId, fallback to default test user ID if empty
     val activeUserId = if (userId.isBlank()) "b64361ca-719d-4a07-b50f-910d8e05f9da" else userId
@@ -62,7 +61,6 @@ fun StatsScreen(
     StatsScreenContent(
         uiState = uiState,
         appLanguage = appLanguage,
-        onNavigate = onNavigate,
         onRetry = { statsViewModel.fetchStats(activeUserId) }
     )
 }
@@ -71,12 +69,9 @@ fun StatsScreen(
 fun StatsScreenContent(
     uiState: StatsUiState,
     appLanguage: String = "Vietnamese",
-    onNavigate: (Screen) -> Unit,
     onRetry: () -> Unit
 ) {
-    Scaffold(
-        bottomBar = { AppBottomBar(currentScreen = Screen.Stats, onNavigate = onNavigate, appLanguage = appLanguage) }
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -409,7 +404,6 @@ fun StatsScreenPreview() {
     MinLishAppTheme {
         StatsScreenContent(
             uiState = StatsUiState.Success(sampleDashboardData),
-            onNavigate = {},
             onRetry = {}
         )
     }

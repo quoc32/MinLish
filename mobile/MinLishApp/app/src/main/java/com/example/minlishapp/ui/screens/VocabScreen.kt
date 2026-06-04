@@ -50,11 +50,13 @@ import com.example.minlishapp.core.utils.translated
 import com.google.gson.Gson
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.minlishapp.ui.theme.MinLishAppTheme
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 
 @Composable
 fun VocabScreen(
     vocabViewModel: com.example.minlishapp.ui.viewmodel.VocabViewModel,
-    onNavigate: (Screen) -> Unit,
+    navController: NavHostController,
     userProgress: UserProgress,
     activeDeck: Deck?,
     onActiveDeckSelect: (Deck) -> Unit,
@@ -72,7 +74,7 @@ fun VocabScreen(
         isLoadingDecks = isLoadingDecks,
         userProgress = userProgress,
         activeDeck = activeDeck,
-        onNavigate = onNavigate,
+        navController = navController,
         onActiveDeckSelect = onActiveDeckSelect,
         onStartStudy = onStartStudy,
         onCreateDeck = { name, tag, onResult -> vocabViewModel.createDeck(name, tag, onResult) },
@@ -94,7 +96,7 @@ fun VocabScreenContent(
     isLoadingDecks: Boolean,
     userProgress: UserProgress,
     activeDeck: Deck?,
-    onNavigate: (Screen) -> Unit,
+    navController: NavHostController,
     onActiveDeckSelect: (Deck) -> Unit,
     onStartStudy: (Deck) -> Unit = {},
     onCreateDeck: (name: String, tag: String?, onResult: (Boolean, String) -> Unit) -> Unit,
@@ -152,7 +154,6 @@ fun VocabScreenContent(
     }
 
     Scaffold(
-        bottomBar = { AppBottomBar(currentScreen = Screen.VocabDecks, onNavigate = onNavigate, appLanguage = userProgress.appLanguage) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showDialog = true },
@@ -274,7 +275,7 @@ fun VocabScreenContent(
                             currentOffsetPercent = currentOffsetPercent,
                             nextOffsetPercent = nextOffsetPercent,
                             userProgress = userProgress,
-                            onNavigate = onNavigate,
+                            navController = navController,
                             onActiveDeckSelect = onActiveDeckSelect,
                             onStartStudy = onStartStudy,
                             onUpdateDeck = onUpdateDeck,
@@ -401,7 +402,7 @@ fun DeckItem(
     currentOffsetPercent: Float,
     nextOffsetPercent: Float,
     userProgress: UserProgress,
-    onNavigate: (Screen) -> Unit,
+    navController: NavHostController,
     onActiveDeckSelect: (Deck) -> Unit,
     onStartStudy: (Deck) -> Unit,
     onUpdateDeck: (deckId: String, name: String, tag: String?, onResult: (Boolean, String) -> Unit) -> Unit,
@@ -1526,7 +1527,7 @@ fun VocabScreenPreview() {
             isLoadingDecks = false,
             userProgress = mockUserProgress,
             activeDeck = null,
-            onNavigate = {},
+            navController = rememberNavController(),
             onActiveDeckSelect = {},
             onStartStudy = {},
             onCreateDeck = { _, _, cb -> cb(true, "") },

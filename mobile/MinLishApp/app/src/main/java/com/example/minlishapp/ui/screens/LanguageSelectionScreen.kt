@@ -18,12 +18,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 
 @Composable
 fun LanguageSelectionScreen(
     userProgress: com.example.minlishapp.data.UserProgress,
     onProgressUpdate: (com.example.minlishapp.data.UserProgress) -> Unit,
-    onNavigate: (Screen) -> Unit
+    navController: NavHostController
 ) {
     var selectedLang by remember { mutableStateOf(if (userProgress.appLanguage == "English") "en" else "vi") }
 
@@ -51,7 +52,7 @@ fun LanguageSelectionScreen(
                     modifier = Modifier.padding(top = 16.dp)
                 ) {
                     IconButton(
-                        onClick = { onNavigate(Screen.Welcome) },
+                        onClick = { navController.navigate(AppRoute.Welcome.route) },
                         modifier = Modifier
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surface)
@@ -175,7 +176,7 @@ fun LanguageSelectionScreen(
             Button(
                 onClick = {
                     onProgressUpdate(userProgress.copy(appLanguage = if (selectedLang == "en") "English" else "Vietnamese"))
-                    onNavigate(Screen.OnboardingGoals)
+                    navController.navigate(AppRoute.OnboardingGoals.route)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

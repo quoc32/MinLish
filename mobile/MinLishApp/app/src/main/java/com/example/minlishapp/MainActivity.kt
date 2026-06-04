@@ -2,28 +2,27 @@ package com.example.minlishapp
 
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.example.minlishapp.data.*
-import com.example.minlishapp.data.repository.DeckRepository
-import com.example.minlishapp.data.repository.LearningRepository
+import com.example.minlishapp.ui.navigation.AppNavGraph
 import com.example.minlishapp.ui.screens.*
 import com.example.minlishapp.ui.theme.MinLishAppTheme
 import com.example.minlishapp.ui.viewmodel.*
-import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.os.Build
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.example.minlishapp.core.network.TokenManager
 
 class MainActivity : ComponentActivity() {
@@ -34,7 +33,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val context = LocalContext.current
-            val coroutineScope = rememberCoroutineScope()
 
             // Request Notification Permission on Android 13+
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -59,7 +57,6 @@ class MainActivity : ComponentActivity() {
             val sharedPrefs = remember { context.getSharedPreferences("minlish_prefs", android.content.Context.MODE_PRIVATE) }
             val savedLanguage = remember { sharedPrefs.getString("app_language", "Vietnamese") ?: "Vietnamese" }
             var isDarkTheme by remember { mutableStateOf(false) }
-            var currentScreen by remember { mutableStateOf(Screen.Splash) }
             var userProgress by remember { mutableStateOf(UserProgress(appLanguage = savedLanguage)) }
             var activeDeck by remember { mutableStateOf<Deck?>(null) }
 
@@ -67,13 +64,18 @@ class MainActivity : ComponentActivity() {
                 sharedPrefs.edit().putString("app_language", userProgress.appLanguage).apply()
             }
 
+            // ============================================================
+            // NAVIGATION CONTROLLER
+            // ============================================================
+            val navController = rememberNavController()
+
             // Setup deep link token receiver
             val tokenManager = remember { TokenManager.getInstance(context) }
             LaunchedEffect(Unit) {
                 onTokenReceivedCallback = { token, refreshToken ->
                     tokenManager.saveToken(token)
                     tokenManager.saveRefreshToken(refreshToken)
-                    currentScreen = Screen.ResetPassword
+                    navController.navigate(AppRoute.ResetPassword.route)
                 }
                 handleIntent(intent)
             }
@@ -88,203 +90,39 @@ class MainActivity : ComponentActivity() {
             val profileViewModel: ProfileViewModel = viewModel()
 
             // ============================================================
-            // STATE COLLECTIONS FROM VIEWMODELS
-            // ============================================================
-            val decks by vocabViewModel.decks.collectAsState()
-            val isLoadingDecks by vocabViewModel.isLoading.collectAsState()
-
-            val dailyPlan by learningViewModel.dailyPlan.collectAsState()
-            val isLoadingDailyPlan by learningViewModel.isLoadingDailyPlan.collectAsState()
-
-            val sessionXpGained by learningViewModel.sessionXpGained.collectAsState()
-            val sessionStreak by learningViewModel.sessionStreak.collectAsState()
-            val sessionAccuracy by learningViewModel.sessionAccuracy.collectAsState()
-
-            // ============================================================
-            // FETCH DATA WHEN ENTERING DASHBOARD
-            // ============================================================
-            LaunchedEffect(currentScreen, userProgress.userId) {
-                if (currentScreen == Screen.Dashboard && userProgress.userId.isNotEmpty()) {
-                    vocabViewModel.fetchDecks()
-                    learningViewModel.fetchDailyPlan()
-                }
-            }
-
-            // ============================================================
-            // BACK HANDLER
-            // ============================================================
-            BackHandler(enabled = currentScreen != Screen.Dashboard && currentScreen != Screen.Splash && currentScreen != Screen.Welcome) {
-                currentScreen = when (currentScreen) {
-                    Screen.Login -> Screen.Welcome
-                    Screen.LanguageSelection -> Screen.Welcome
-                    Screen.OnboardingGoals -> Screen.LanguageSelection
-                    Screen.OnboardingDailyWords -> Screen.OnboardingGoals
-                    Screen.VocabDecks, Screen.Stats, Screen.Profile -> Screen.Dashboard
-                    Screen.Flashcards -> Screen.Dashboard
-                    Screen.LessonComplete -> Screen.Dashboard
-                    else -> Screen.Dashboard
-                }
-            }
-
-            // ============================================================
-            // SCREEN ROUTING
+            // SCREEN ROUTING WITH NAVIGATION COMPONENT
             // ============================================================
             MinLishAppTheme(darkTheme = isDarkTheme) {
-                Crossfade(targetState = currentScreen, label = "ScreenTransition") { targetScreen ->
-                    when (targetScreen) {
-                        Screen.Splash -> SplashScreen(onNavigate = { currentScreen = it })
-                        Screen.Welcome -> WelcomeScreen(
-                            onLoginSuccess = { userId, email, displayName, targetGoal, xp, level, streak ->
-                                userProgress = userProgress.copy(
-                                    userId = userId,
-                                    email = email,
-                                    name = displayName,
-                                    targetGoal = targetGoal,
-                                    xp = xp,
-                                    level = level,
-                                    streak = streak
-                                )
-                            },
-                            onNavigate = { currentScreen = it },
-                            appLanguage = userProgress.appLanguage
-                        )
-                        Screen.Login -> LoginScreen(
-                            authViewModel = authViewModel,
-                            onLoginSuccess = { userId, email, displayName, targetGoal, xp, level, streak ->
-                                userProgress = userProgress.copy(
-                                    userId = userId,
-                                    email = email,
-                                    name = displayName,
-                                    targetGoal = targetGoal,
-                                    xp = xp,
-                                    level = level,
-                                    streak = streak
-                                )
-                            },
-                            onNavigate = { currentScreen = it },
-                            appLanguage = userProgress.appLanguage
-                        )
-                        Screen.LanguageSelection -> LanguageSelectionScreen(
-                            userProgress = userProgress,
-                            onProgressUpdate = { userProgress = it },
-                            onNavigate = { currentScreen = it }
-                        )
-                        Screen.OnboardingGoals -> OnboardingGoalsScreen(
-                            userProgress = userProgress,
-                            onProgressUpdate = { userProgress = it },
-                            onNavigate = { currentScreen = it }
-                        )
-                        Screen.OnboardingDailyWords -> OnboardingDailyWordsScreen(
-                            userProgress = userProgress,
-                            onProgressUpdate = { userProgress = it },
-                            onNavigate = { currentScreen = it }
-                        )
-                        Screen.Dashboard -> DashboardScreen(
-                            userProgress = userProgress,
-                            isDarkTheme = isDarkTheme,
-                            onThemeToggle = { isDarkTheme = !isDarkTheme },
-                            onNavigate = { currentScreen = it },
-                            activeDeck = activeDeck,
-                            onActiveDeckSelect = { deck ->
-                                activeDeck = deck
-                            },
-                            decks = decks,
-                            dailyPlan = dailyPlan,
-                            isLoading = isLoadingDecks || isLoadingDailyPlan,
-                            onStartDailyPlan = {
-                                // Build a deck from daily plan cards
-                                val planCards = dailyPlan?.let { plan ->
-                                    val allCards = plan.inSessionReviewCards + plan.reviewCards + plan.newCards
-                                    allCards.map { card ->
-                                        Word(
-                                            id = card.id,
-                                            word = card.word,
-                                            pronunciation = card.pronunciation,
-                                            meaning = card.meaning,
-                                            description = card.descriptionEn ?: "",
-                                            example = card.example ?: "",
-                                            easeFactor = card.progress?.easeFactor ?: 2.5,
-                                            repetitions = card.progress?.repetitions ?: 0,
-                                            intervalDays = card.progress?.interval ?: 0
-                                        )
-                                    }
-                                } ?: emptyList()
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
 
-                                if (planCards.isNotEmpty()) {
-                                    activeDeck = Deck(
-                                        id = "daily_plan",
-                                        name = "Kế hoạch hôm nay",
-                                        description = "Từ mới + Ôn tập hàng ngày",
-                                        tags = listOf("Daily Plan"),
-                                        words = planCards
-                                    )
-                                    currentScreen = Screen.Flashcards
-                                }
-                            },
-                            onStartStudy = { deck ->
-                                activeDeck = deck
-                                Toast.makeText(context, "Đang tải bài học...", Toast.LENGTH_SHORT).show()
-                                vocabViewModel.fetchDeckCards(deck.id) { loadedWords ->
-                                    activeDeck = deck.copy(words = loadedWords)
-                                    currentScreen = Screen.Flashcards
-                                }
-                            }
-                        )
-                        Screen.VocabDecks -> VocabScreen(
-                            vocabViewModel = vocabViewModel,
-                            onNavigate = { currentScreen = it },
-                            userProgress = userProgress,
-                            activeDeck = activeDeck,
-                            onActiveDeckSelect = { deck ->
-                                activeDeck = deck
-                            },
-                            onStartStudy = { deck ->
-                                activeDeck = deck
-                                Toast.makeText(context, "Đang tải bài học...", Toast.LENGTH_SHORT).show()
-                                vocabViewModel.fetchDeckCards(deck.id) { loadedWords ->
-                                    activeDeck = deck.copy(words = loadedWords)
-                                    currentScreen = Screen.Flashcards
-                                }
-                            }
-                        )
-                        Screen.Flashcards -> FlashcardScreen(
-                            learningViewModel = learningViewModel,
-                            activeDeck = activeDeck ?: decks.firstOrNull(),
-                            onNavigate = { currentScreen = it },
-                            onSubmitReview = { cardId, quality ->
-                                learningViewModel.submitReview(cardId, quality, userProgress) { updatedProgress ->
-                                    userProgress = updatedProgress
-                                }
-                            },
-                            userProgress = userProgress
-                        )
-                        Screen.LessonComplete -> LessonCompleteScreen(
-                            onNavigate = { currentScreen = it },
-                            xpGained = sessionXpGained,
-                            streak = sessionStreak,
-                            accuracy = sessionAccuracy,
-                            appLanguage = userProgress.appLanguage
-                        )
-                        Screen.Stats -> StatsScreen(
-                            statsViewModel = statsViewModel,
-                            userId = userProgress.userId,
-                            appLanguage = userProgress.appLanguage,
-                            onNavigate = { currentScreen = it }
-                        )
-                        Screen.Profile -> ProfileScreen(
-                            profileViewModel = profileViewModel,
-                            userProgress = userProgress,
-                            onProgressUpdate = { userProgress = it },
-                            isDarkTheme = isDarkTheme,
-                            onThemeToggle = { isDarkTheme = !isDarkTheme },
-                            onNavigate = { currentScreen = it }
-                        )
-                        Screen.ResetPassword -> ResetPasswordScreen(
-                            authViewModel = authViewModel,
-                            onNavigate = { currentScreen = it },
-                            appLanguage = userProgress.appLanguage
-                        )
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    bottomBar = {
+                        if (currentRoute in AppRoute.bottomBarRoutes) {
+                            AppBottomBar(
+                                navController = navController,
+                                currentRoute = currentRoute,
+                                appLanguage = userProgress.appLanguage
+                            )
+                        }
                     }
+                ) { innerPadding ->
+                    AppNavGraph(
+                        navController = navController,
+                        modifier = Modifier.padding(innerPadding),
+                        userProgress = userProgress,
+                        onProgressUpdate = { userProgress = it },
+                        isDarkTheme = isDarkTheme,
+                        onThemeToggle = { isDarkTheme = !isDarkTheme },
+                        activeDeck = activeDeck,
+                        onActiveDeckSelect = { activeDeck = it },
+                        vocabViewModel = vocabViewModel,
+                        authViewModel = authViewModel,
+                        statsViewModel = statsViewModel,
+                        learningViewModel = learningViewModel,
+                        profileViewModel = profileViewModel
+                    )
                 }
             }
         }

@@ -21,13 +21,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import com.example.minlishapp.data.UserProgress
 
 @Composable
 fun OnboardingGoalsScreen(
     userProgress: UserProgress,
     onProgressUpdate: (UserProgress) -> Unit,
-    onNavigate: (Screen) -> Unit
+    navController: NavHostController
 ) {
     var selectedGoal by remember { mutableStateOf(userProgress.targetGoal) }
 
@@ -59,7 +60,7 @@ fun OnboardingGoalsScreen(
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
                     IconButton(
-                        onClick = { onNavigate(Screen.LanguageSelection) },
+                        onClick = { navController.navigate(AppRoute.LanguageSelection.route) },
                         modifier = Modifier
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surface)
@@ -152,7 +153,7 @@ fun OnboardingGoalsScreen(
             Button(
                 onClick = {
                     onProgressUpdate(userProgress.copy(targetGoal = selectedGoal))
-                    onNavigate(Screen.OnboardingDailyWords)
+                    navController.navigate(AppRoute.OnboardingDailyWords.route)
                 },
                 modifier = Modifier
                     .fillMaxWidth()

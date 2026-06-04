@@ -34,6 +34,7 @@ import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import com.example.minlishapp.core.utils.translated
 import androidx.compose.runtime.collectAsState
+import androidx.navigation.NavHostController
 
 @Composable
 
@@ -43,7 +44,7 @@ fun ProfileScreen(
     onProgressUpdate: (UserProgress) -> Unit,
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
-    onNavigate: (Screen) -> Unit
+    navController: NavHostController
 ) {
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("minlish_prefs", Context.MODE_PRIVATE) }
@@ -120,9 +121,7 @@ fun ProfileScreen(
         }
     }
 
-    Scaffold(
-        bottomBar = { AppBottomBar(currentScreen = Screen.Profile, onNavigate = onNavigate, appLanguage = userProgress.appLanguage) }
-    ) { innerPadding ->
+    Scaffold { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -646,7 +645,9 @@ fun ProfileScreen(
                         TokenManager.getInstance(context).clearToken()
                         onProgressUpdate(UserProgress(appLanguage = userProgress.appLanguage))
                         Toast.makeText(context, "Đăng xuất thành công!".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
-                        onNavigate(Screen.Welcome)
+                        navController.navigate(AppRoute.Welcome.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
             ) {
                 Row(

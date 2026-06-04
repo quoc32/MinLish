@@ -33,6 +33,7 @@ import com.example.minlishapp.core.utils.Sm2Engine
 import com.example.minlishapp.core.utils.translated
 import com.example.minlishapp.ui.theme.*
 import androidx.compose.runtime.collectAsState
+import androidx.navigation.NavHostController
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -41,7 +42,7 @@ import kotlinx.coroutines.launch
 fun FlashcardScreen(
     learningViewModel: com.example.minlishapp.ui.viewmodel.LearningViewModel,
     activeDeck: Deck?,
-    onNavigate: (Screen) -> Unit,
+    navController: NavHostController,
     onSubmitReview: (cardId: String, quality: String) -> Unit,
     userProgress: com.example.minlishapp.data.UserProgress
 ) {
@@ -130,7 +131,7 @@ fun FlashcardScreen(
                     horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { onNavigate(Screen.VocabDecks) }) {
+                    IconButton(onClick = { navController.navigate(AppRoute.VocabDecks.route) }) {
                         Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
@@ -226,7 +227,7 @@ fun FlashcardScreen(
                     }
 
                     OutlinedButton(
-                        onClick = { onNavigate(Screen.VocabDecks) },
+                        onClick = { navController.navigate(AppRoute.VocabDecks.route) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
@@ -249,7 +250,7 @@ fun FlashcardScreen(
     // Khi hoàn thành học tất cả các từ trong Deck
     if (studyWords.isNotEmpty() && currentIndex >= studyWords.size) {
         LaunchedEffect(Unit) {
-            onNavigate(Screen.LessonComplete)
+            navController.navigate(AppRoute.LessonComplete.route)
         }
         return
     }
@@ -296,7 +297,7 @@ fun FlashcardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { onNavigate(Screen.VocabDecks) }) {
+                IconButton(onClick = { navController.navigate(AppRoute.VocabDecks.route) }) {
                     Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
                 }
 

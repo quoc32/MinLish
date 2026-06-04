@@ -1,6 +1,5 @@
 package com.example.minlishapp.ui.screens
 
-import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Book
@@ -8,16 +7,16 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import com.example.minlishapp.core.utils.translated
 
 @Composable
 fun AppBottomBar(
-    currentScreen: Screen,
-    onNavigate: (Screen) -> Unit,
+    navController: NavHostController,
+    currentRoute: String?,
     appLanguage: String = "Vietnamese"
 ) {
     NavigationBar(
@@ -25,17 +24,25 @@ fun AppBottomBar(
         tonalElevation = 8.dp
     ) {
         val items = listOf(
-            Triple(Screen.Dashboard, Icons.Default.Home, "Lộ trình"),
-            Triple(Screen.VocabDecks, Icons.Default.Book, "Từ vựng"),
-            Triple(Screen.Stats, Icons.Default.BarChart, "Thống kê"),
-            Triple(Screen.Profile, Icons.Default.Person, "Cá nhân")
+            Triple(AppRoute.Dashboard.route, Icons.Default.Home, "Lộ trình"),
+            Triple(AppRoute.VocabDecks.route, Icons.Default.Book, "Từ vựng"),
+            Triple(AppRoute.Stats.route, Icons.Default.BarChart, "Thống kê"),
+            Triple(AppRoute.Profile.route, Icons.Default.Person, "Cá nhân")
         )
 
-        items.forEach { (screen, icon, label) ->
-            val selected = currentScreen == screen
+        items.forEach { (route, icon, label) ->
+            val selected = currentRoute == route
             NavigationBarItem(
                 selected = selected,
-                onClick = { if (!selected) onNavigate(screen) },
+                onClick = {
+                    if (!selected) {
+                        navController.navigate(route) {
+                            popUpTo(AppRoute.Dashboard.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
                 icon = {
                     Icon(
                         imageVector = icon,

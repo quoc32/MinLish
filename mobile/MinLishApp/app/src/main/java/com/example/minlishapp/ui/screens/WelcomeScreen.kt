@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.example.minlishapp.R
 import com.example.minlishapp.data.repository.AuthRepository
 import com.example.minlishapp.core.utils.translated
+import androidx.navigation.NavHostController
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,7 +64,7 @@ fun RedWhiteEmailIcon(modifier: Modifier = Modifier) {
 @Composable
 fun WelcomeScreen(
     onLoginSuccess: (userId: String, email: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
-    onNavigate: (Screen) -> Unit,
+    navController: NavHostController,
     appLanguage: String = "Vietnamese"
 ) {
     val context = LocalContext.current
@@ -175,7 +176,7 @@ fun WelcomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Button(
-                    onClick = { onNavigate(Screen.Login) },
+                    onClick = { navController.navigate(AppRoute.Login.route) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),

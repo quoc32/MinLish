@@ -25,12 +25,13 @@ import com.example.minlishapp.core.network.TokenManager
 import com.example.minlishapp.data.ResetPasswordRequest
 import com.example.minlishapp.ui.viewmodel.AuthViewModel
 import androidx.compose.runtime.collectAsState
+import androidx.navigation.NavHostController
 import com.example.minlishapp.core.utils.translated
 
 @Composable
 fun ResetPasswordScreen(
     authViewModel: AuthViewModel,
-    onNavigate: (Screen) -> Unit,
+    navController: NavHostController,
     appLanguage: String = "Vietnamese"
 ) {
     val context = LocalContext.current
@@ -140,7 +141,7 @@ fun ResetPasswordScreen(
                             if (success) {
                                 Toast.makeText(context, "Đổi mật khẩu thành công! Vui lòng đăng nhập lại.".translated(appLanguage), Toast.LENGTH_LONG).show()
                                 authViewModel.setShowForgotPasswordDialog(false)
-                                onNavigate(Screen.Login)
+                                navController.navigate(AppRoute.Login.route)
                             }
                         }
                     }
@@ -170,7 +171,7 @@ fun ResetPasswordScreen(
                 onClick = {
                     tokenManager.clearToken()
                     authViewModel.setShowForgotPasswordDialog(false)
-                    onNavigate(Screen.Login)
+                    navController.navigate(AppRoute.Login.route)
                 }
             ) {
                 Text("Quay lại đăng nhập".translated(appLanguage))

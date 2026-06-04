@@ -41,6 +41,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
 import com.example.minlishapp.core.utils.translated
+import androidx.navigation.NavHostController
 
 fun getFriendlyErrorMessage(rawMsg: String?, appLanguage: String): String {
     if (rawMsg == null) return "Có lỗi xảy ra, vui lòng thử lại sau.".translated(appLanguage)
@@ -58,7 +59,7 @@ fun getFriendlyErrorMessage(rawMsg: String?, appLanguage: String): String {
 fun LoginScreen(
     authViewModel: AuthViewModel,
     onLoginSuccess: (userId: String, email: String, displayName: String, targetGoal: String, xp: Int, level: Int, streak: Int) -> Unit,
-    onNavigate: (Screen) -> Unit,
+    navController: NavHostController,
     appLanguage: String = "Vietnamese"
 ) {
     val context = LocalContext.current
@@ -112,9 +113,9 @@ fun LoginScreen(
                             profile?.streak ?: 0
                         )
                         if (profile == null) {
-                            onNavigate(Screen.LanguageSelection)
+                            navController.navigate(AppRoute.LanguageSelection.route) { popUpTo(0) { inclusive = true } }
                         } else {
-                            onNavigate(Screen.Dashboard)
+                            navController.navigate(AppRoute.Dashboard.route) { popUpTo(0) { inclusive = true } }
                         }
                     }
                 }
@@ -148,7 +149,7 @@ fun LoginScreen(
                 horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { onNavigate(Screen.Welcome) }) {
+                IconButton(onClick = { navController.navigate(AppRoute.Welcome.route) }) {
                     Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
                 }
             }
@@ -370,9 +371,9 @@ fun LoginScreen(
                                         profile?.streak ?: 0
                                     )
                                     if (profile == null) {
-                                        onNavigate(Screen.LanguageSelection)
+                                        navController.navigate(AppRoute.LanguageSelection.route) { popUpTo(0) { inclusive = true } }
                                     } else {
-                                        onNavigate(Screen.Dashboard)
+                                        navController.navigate(AppRoute.Dashboard.route) { popUpTo(0) { inclusive = true } }
                                     }
                                 } else {
                                     val rawError = authViewModel.errorMessage.value
@@ -396,7 +397,7 @@ fun LoginScreen(
                                         profile?.streak ?: 0
                                     )
                                     Toast.makeText(context, "Đăng ký thành công!".translated(appLanguage), Toast.LENGTH_SHORT).show()
-                                    onNavigate(Screen.LanguageSelection)
+                                    navController.navigate(AppRoute.LanguageSelection.route) { popUpTo(0) { inclusive = true } }
                                 } else {
                                     val rawError = authViewModel.errorMessage.value
                                     authViewModel.setErrorMessage(getFriendlyErrorMessage(rawError, appLanguage))
