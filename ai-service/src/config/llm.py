@@ -17,7 +17,7 @@ llm_router = ChatOpenAI(
 llm = ChatOpenAI(
     openai_api_base=os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1"),
     openai_api_key=os.getenv("LLM_API_KEY"),
-    model_name="qwen/qwen3-32b",
+    model_name="llama-3.3-70b-versatile",
     temperature=0.3
 )
  

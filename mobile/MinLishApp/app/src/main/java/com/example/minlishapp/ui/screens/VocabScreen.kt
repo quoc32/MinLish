@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -154,12 +155,30 @@ fun VocabScreenContent(
     Scaffold(
         bottomBar = { AppBottomBar(currentScreen = Screen.VocabDecks, onNavigate = onNavigate, appLanguage = userProgress.appLanguage) },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Thêm bộ từ".translated(userProgress.appLanguage))
+                // FAB AI Smart Tutor
+                SmallFloatingActionButton(
+                    onClick = { onNavigate(Screen.AiTutor) },
+                    containerColor = Color(0xFF7C3AED), // Tím Violet
+                    contentColor = Color.White
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "AI Smart Tutor".translated(userProgress.appLanguage)
+                    )
+                }
+
+                // FAB Thêm bộ từ
+                FloatingActionButton(
+                    onClick = { showDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Thêm bộ từ".translated(userProgress.appLanguage))
+                }
             }
         }
     ) { innerPadding ->

@@ -4,3 +4,10 @@ __pycache__/
 .venv/
 .python-version
 .agents/
+
+# Documentation files to ignore
+ai_smart_tutor_integration_summary.md
+ai_smart_tutor_spec.md
+flow1_implementation.md
+flow2_implementation.md
+flow3_grammar_examiner.md

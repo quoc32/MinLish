@@ -11,6 +11,7 @@ if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
 val apiBackendUrl = localProperties.getProperty("api.backend_url")
+val apiAiServiceUrl = localProperties.getProperty("api.ai_service_url")
 
 
 android {
@@ -31,6 +32,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
         buildConfigField("String", "API_BACKEND_URL", if (apiBackendUrl != null) "\"$apiBackendUrl\"" else "null")
+        buildConfigField("String", "API_AI_SERVICE_URL", if (apiAiServiceUrl != null) "\"$apiAiServiceUrl\"" else "null")
     }
 
     buildTypes {
@@ -79,4 +81,7 @@ dependencies {
 
     // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:21.0.0")
+
+    // Markdown rendering for AI Smart Tutor chat
+    implementation("com.github.jeziellago:compose-markdown:0.5.7")
 }

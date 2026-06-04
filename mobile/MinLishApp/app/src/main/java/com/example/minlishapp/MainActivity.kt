@@ -86,6 +86,7 @@ class MainActivity : ComponentActivity() {
             val statsViewModel: StatsViewModel = viewModel()
             val learningViewModel: LearningViewModel = viewModel()
             val profileViewModel: ProfileViewModel = viewModel()
+            val tutorViewModel: TutorViewModel = viewModel()
 
             // ============================================================
             // STATE COLLECTIONS FROM VIEWMODELS
@@ -119,7 +120,7 @@ class MainActivity : ComponentActivity() {
                     Screen.LanguageSelection -> Screen.Welcome
                     Screen.OnboardingGoals -> Screen.LanguageSelection
                     Screen.OnboardingDailyWords -> Screen.OnboardingGoals
-                    Screen.VocabDecks, Screen.Stats, Screen.Profile -> Screen.Dashboard
+                    Screen.VocabDecks, Screen.Stats, Screen.Profile, Screen.AiTutor -> Screen.Dashboard
                     Screen.Flashcards -> Screen.Dashboard
                     Screen.LessonComplete -> Screen.Dashboard
                     else -> Screen.Dashboard
@@ -283,6 +284,11 @@ class MainActivity : ComponentActivity() {
                             authViewModel = authViewModel,
                             onNavigate = { currentScreen = it },
                             appLanguage = userProgress.appLanguage
+                        )
+                        Screen.AiTutor -> TutorChatScreen(
+                            tutorViewModel = tutorViewModel,
+                            userProgress = userProgress,
+                            onNavigate = { currentScreen = it }
                         )
                     }
                 }

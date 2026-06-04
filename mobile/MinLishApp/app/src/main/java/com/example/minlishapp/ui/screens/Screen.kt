@@ -13,5 +13,6 @@ enum class Screen {
     LessonComplete,
     Stats,
     Profile,
-    ResetPassword
+    ResetPassword,
+    AiTutor
 }
