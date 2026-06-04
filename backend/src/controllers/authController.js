@@ -165,7 +165,7 @@ async function forgotPassword(req, res) {
 
 async function resetPassword(req, res) {
   try {
-    const { password } = req.body;
+    const { password, refresh_token } = req.body;
     
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -183,7 +183,14 @@ async function resetPassword(req, res) {
       });
     }
 
-    await authService.resetPassword(token, password);
+    if (!refresh_token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Refresh token is required.'
+      });
+    }
+
+    await authService.resetPassword(token, refresh_token, password);
 
     res.status(200).json({
       success: true,
