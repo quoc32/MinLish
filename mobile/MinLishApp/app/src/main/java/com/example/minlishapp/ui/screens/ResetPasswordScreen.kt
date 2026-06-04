@@ -23,18 +23,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.minlishapp.core.network.TokenManager
 import com.example.minlishapp.data.ResetPasswordRequest
-import com.example.minlishapp.data.repository.AuthRepository
+import com.example.minlishapp.ui.viewmodel.AuthViewModel
+import androidx.compose.runtime.collectAsState
 import com.example.minlishapp.core.utils.translated
-import kotlinx.coroutines.launch
 
 @Composable
 fun ResetPasswordScreen(
+    authViewModel: AuthViewModel,
     onNavigate: (Screen) -> Unit,
     appLanguage: String = "Vietnamese"
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val authRepository = remember { AuthRepository.create(context) }
     val tokenManager = remember { TokenManager.getInstance(context) }
 
     var password by remember { mutableStateOf("") }
@@ -42,8 +41,8 @@ fun ResetPasswordScreen(
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isConfirmPasswordVisible by remember { mutableStateOf(false) }
     
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
+    val isLoading by authViewModel.isLoading.collectAsState()
+    val errorMessage by authViewModel.errorMessage.collectAsState()
 
     Box(
         modifier = Modifier
@@ -77,7 +76,7 @@ fun ResetPasswordScreen(
             // Password Field
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it; errorMessage = "" },
+                onValueChange = { password = it; authViewModel.setErrorMessage("") },
                 label = { Text("Mật khẩu mới".translated(appLanguage)) },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon = {
@@ -99,7 +98,7 @@ fun ResetPasswordScreen(
             // Confirm Password Field
             OutlinedTextField(
                 value = confirmPassword,
-                onValueChange = { confirmPassword = it; errorMessage = "" },
+                onValueChange = { confirmPassword = it; authViewModel.setErrorMessage("") },
                 label = { Text("Xác nhận mật khẩu mới".translated(appLanguage)) },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                 trailingIcon = {
@@ -131,28 +130,17 @@ fun ResetPasswordScreen(
             Button(
                 onClick = {
                     if (password.isBlank() || confirmPassword.isBlank()) {
-                        errorMessage = "Vui lòng điền đầy đủ mật khẩu!".translated(appLanguage)
+                        authViewModel.setErrorMessage("Vui lòng điền đầy đủ mật khẩu!".translated(appLanguage))
                     } else if (password.length < 6) {
-                        errorMessage = "Mật khẩu phải chứa ít nhất 6 ký tự!".translated(appLanguage)
+                        authViewModel.setErrorMessage("Mật khẩu phải chứa ít nhất 6 ký tự!".translated(appLanguage))
                     } else if (password != confirmPassword) {
-                        errorMessage = "Mật khẩu xác nhận không khớp!".translated(appLanguage)
+                        authViewModel.setErrorMessage("Mật khẩu xác nhận không khớp!".translated(appLanguage))
                     } else {
-                        isLoading = true
-                        errorMessage = ""
-                        coroutineScope.launch {
-                            try {
-                                val response = authRepository.resetPassword(ResetPasswordRequest(password))
-                                isLoading = false
-                                if (response.isSuccessful && response.body()?.success == true) {
-                                    Toast.makeText(context, "Đổi mật khẩu thành công! Vui lòng đăng nhập lại.".translated(appLanguage), Toast.LENGTH_LONG).show()
-                                    tokenManager.clearToken()
-                                    onNavigate(Screen.Login)
-                                } else {
-                                    errorMessage = response.body()?.message ?: "Đổi mật khẩu thất bại!".translated(appLanguage)
-                                }
-                            } catch (e: Exception) {
-                                isLoading = false
-                                errorMessage = "Lỗi kết nối".translated(appLanguage) + ": ${e.localizedMessage}"
+                        authViewModel.resetPassword(password) { success, msg ->
+                            if (success) {
+                                Toast.makeText(context, "Đổi mật khẩu thành công! Vui lòng đăng nhập lại.".translated(appLanguage), Toast.LENGTH_LONG).show()
+                                authViewModel.setShowForgotPasswordDialog(false)
+                                onNavigate(Screen.Login)
                             }
                         }
                     }
@@ -181,6 +169,7 @@ fun ResetPasswordScreen(
             TextButton(
                 onClick = {
                     tokenManager.clearToken()
+                    authViewModel.setShowForgotPasswordDialog(false)
                     onNavigate(Screen.Login)
                 }
             ) {

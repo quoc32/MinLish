@@ -14,13 +14,22 @@ class TokenManager(context: Context) {
         return prefs.getString(KEY_TOKEN, null)
     }
 
+    fun saveRefreshToken(token: String) {
+        prefs.edit().putString(KEY_REFRESH_TOKEN, token).apply()
+    }
+
+    fun getRefreshToken(): String? {
+        return prefs.getString(KEY_REFRESH_TOKEN, null)
+    }
+
     fun clearToken() {
-        prefs.edit().remove(KEY_TOKEN).apply()
+        prefs.edit().remove(KEY_TOKEN).remove(KEY_REFRESH_TOKEN).apply()
     }
 
     companion object {
         private const val PREFS_NAME = "minlish_prefs"
         private const val KEY_TOKEN = "jwt_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
         
         @Volatile
         private var instance: TokenManager? = null

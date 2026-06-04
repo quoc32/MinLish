@@ -59,7 +59,7 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
                     fetchDecks()
                     onResult(true, "Deck created successfully")
                 } else {
-                    onResult(false, response.body()?.message ?: "Failed to create deck")
+                    onResult(false, extractErrorMessage(response, "Failed to create deck"))
                 }
             } catch (e: Exception) {
                 Log.e("VocabViewModel", "Failed to create deck: ${e.message}")
@@ -76,7 +76,7 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
                     fetchDecks()
                     onResult(true, "Deck updated successfully")
                 } else {
-                    onResult(false, response.body()?.message ?: "Failed to update deck")
+                    onResult(false, extractErrorMessage(response, "Failed to update deck"))
                 }
             } catch (e: Exception) {
                 Log.e("VocabViewModel", "Failed to update deck: ${e.message}")
@@ -93,7 +93,7 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
                     fetchDecks()
                     onResult(true, "Deck deleted successfully")
                 } else {
-                    onResult(false, response.body()?.message ?: "Failed to delete deck")
+                    onResult(false, extractErrorMessage(response, "Failed to delete deck"))
                 }
             } catch (e: Exception) {
                 Log.e("VocabViewModel", "Failed to delete deck: ${e.message}")
@@ -166,7 +166,7 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
                     fetchDecks() // Or just update local state
                     onResult(true, "Card created successfully")
                 } else {
-                    onResult(false, response.body()?.message ?: "Failed to create card")
+                    onResult(false, extractErrorMessage(response, "Failed to create card"))
                 }
             } catch (e: Exception) {
                 Log.e("VocabViewModel", "Failed to create card: ${e.message}")
@@ -196,7 +196,7 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
                 if (response.isSuccessful && response.body()?.success == true) {
                     onResult(true, "Card updated successfully")
                 } else {
-                    onResult(false, response.body()?.message ?: "Failed to update card")
+                    onResult(false, extractErrorMessage(response, "Failed to update card"))
                 }
             } catch (e: Exception) {
                 Log.e("VocabViewModel", "Failed to update card: ${e.message}")
@@ -212,7 +212,7 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
                 if (response.isSuccessful && response.body()?.success == true) {
                     onResult(true, "Card deleted successfully")
                 } else {
-                    onResult(false, response.body()?.message ?: "Failed to delete card")
+                    onResult(false, extractErrorMessage(response, "Failed to delete card"))
                 }
             } catch (e: Exception) {
                 Log.e("VocabViewModel", "Failed to delete card: ${e.message}")
@@ -227,7 +227,17 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val response = deckRepository.exportDeck(deckId)
                 if (response.isSuccessful && response.body() != null) {
-                    onResult(true, response.body())
+                    val apiResponse = response.body()!!
+                    if (apiResponse.success && apiResponse.data != null) {
+                        val payload = apiResponse.data
+                        val exportJson = DeckExportJson(
+                            deck = payload.deck,
+                            cards = payload.cards
+                        )
+                        onResult(true, exportJson)
+                    } else {
+                        onResult(false, null)
+                    }
                 } else {
                     onResult(false, null)
                 }
@@ -300,6 +310,19 @@ class VocabViewModel(application: Application) : AndroidViewModel(application) {
                 Log.e("VocabViewModel", "Failed to export deck CSV: ${e.message}")
                 onResult(false, null)
             }
+        }
+    }
+
+    private fun extractErrorMessage(response: retrofit2.Response<*>, defaultMsg: String): String {
+        return try {
+            val errorJson = response.errorBody()?.string()
+            if (errorJson != null) {
+                org.json.JSONObject(errorJson).getString("message") ?: defaultMsg
+            } else {
+                defaultMsg
+            }
+        } catch (e: Exception) {
+            defaultMsg
         }
     }
 }

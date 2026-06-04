@@ -32,7 +32,7 @@ class DeckRepository(private val apiService: DeckApiService) {
     suspend fun deleteDeck(deckId: String): Response<CreateDeckResponse> =
         apiService.deleteDeck(deckId)
 
-    suspend fun exportDeck(deckId: String): Response<DeckExportJson> =
+    suspend fun exportDeck(deckId: String): Response<DeckExportResponse> =
         apiService.exportDeck(deckId)
 
     suspend fun importDeck(request: DeckExportJson): Response<ImportDeckResponse> =

@@ -166,8 +166,10 @@ async function updateProfile(userId, updates) {
 }
 
 async function forgotPassword(email) {
+  const redirectToUrl = process.env.RESET_REDIRECT_URL || 
+                        `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/auth/reset-password-callback`;
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: 'minlish://reset-password'
+    redirectTo: redirectToUrl
   });
 
   if (error) {
@@ -176,7 +178,7 @@ async function forgotPassword(email) {
   return true;
 }
 
-async function resetPassword(token, newPassword) {
+async function resetPassword(token, refreshToken, newPassword) {
   const { createClient } = require('@supabase/supabase-js');
   const tempClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
     auth: {
@@ -187,7 +189,7 @@ async function resetPassword(token, newPassword) {
 
   const { error: sessionError } = await tempClient.auth.setSession({
     access_token: token,
-    refresh_token: ''
+    refresh_token: refreshToken
   });
 
   if (sessionError) {

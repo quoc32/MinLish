@@ -36,6 +36,8 @@ object LanguageHelper {
         "Đã thuộc" to "Mastered",
         "Từ mới" to "New",
         "Đang ôn" to "Reviewing",
+        "Cần ôn" to "Due Review",
+        "Học lại" to "Re-learn",
         "Nhập bộ từ" to "Import Deck",
         "Xuất bộ từ" to "Export Deck",
         "Tạo bộ từ mới" to "Create New Deck",

@@ -25,7 +25,7 @@ interface DeckApiService {
     suspend fun deleteDeck(@Path("id") deckId: String): Response<CreateDeckResponse>
 
     @GET("api/import-export/export/{id}")
-    suspend fun exportDeck(@Path("id") deckId: String): Response<DeckExportJson>
+    suspend fun exportDeck(@Path("id") deckId: String): Response<DeckExportResponse>
 
     @POST("api/import-export/import")
     suspend fun importDeck(@Body request: DeckExportJson): Response<ImportDeckResponse>

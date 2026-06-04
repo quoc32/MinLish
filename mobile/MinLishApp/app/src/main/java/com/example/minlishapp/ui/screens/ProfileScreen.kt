@@ -33,27 +33,28 @@ import com.example.minlishapp.data.repository.LearningRepository
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import com.example.minlishapp.core.utils.translated
+import androidx.compose.runtime.collectAsState
 
 @Composable
 
 fun ProfileScreen(
+    profileViewModel: com.example.minlishapp.ui.viewmodel.ProfileViewModel,
     userProgress: UserProgress,
     onProgressUpdate: (UserProgress) -> Unit,
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
     onNavigate: (Screen) -> Unit
 ) {
-    var isEditingName by remember { mutableStateOf(false) }
-    var nameInput by remember { mutableStateOf(userProgress.name) }
     val context = LocalContext.current
     val sharedPrefs = remember { context.getSharedPreferences("minlish_prefs", Context.MODE_PRIVATE) }
     val coroutineScope = rememberCoroutineScope()
-    val authRepository = remember { AuthRepository.create(context) }
-    val learningRepository = remember { LearningRepository.create(context) }
-    var isLoading by remember { mutableStateOf(false) }
 
-    var masteredWords by remember { mutableStateOf(0) }
-    var accuracyRate by remember { mutableStateOf(0.0) }
+    val isEditingName by profileViewModel.isEditingName.collectAsState()
+    val nameInput by profileViewModel.nameInput.collectAsState()
+    val isLoading by profileViewModel.isLoading.collectAsState()
+
+    val masteredWords by profileViewModel.masteredWords.collectAsState()
+    val accuracyRate by profileViewModel.accuracyRate.collectAsState()
 
     var showPromotionDialog by remember { mutableStateOf(false) }
     var oldTierForPromotion by remember { mutableStateOf("") }
@@ -61,38 +62,7 @@ fun ProfileScreen(
 
     // Tự động tải profile khi vào màn hình
     LaunchedEffect(Unit) {
-        try {
-            val response = authRepository.getProfile()
-            if (response.isSuccessful) {
-                val profile = response.body()?.data
-                if (profile != null) {
-                    onProgressUpdate(userProgress.copy(
-                        name = profile.displayName ?: userProgress.name,
-                        email = profile.email ?: userProgress.email,
-                        targetGoal = profile.targetGoal,
-                        wordsPerDay = profile.wordsPerDay,
-                        xp = profile.xp,
-                        level = profile.level,
-                        streak = profile.streak
-                    ))
-                    nameInput = profile.displayName ?: userProgress.name
-                    accuracyRate = profile.retentionRate
-                }
-            }
-        } catch (e: Exception) {
-            // Ignore for now, keep current state
-        }
-
-        try {
-            val statsRepo = com.example.minlishapp.data.repository.StatsRepository.create()
-            val statsResponse = statsRepo.getStatsDashboard(userProgress.userId)
-            if (statsResponse.success && statsResponse.data != null) {
-                masteredWords = statsResponse.data.donutChart.proficient
-                accuracyRate = statsResponse.data.profile.retentionRate
-            }
-        } catch (e: Exception) {
-            // Ignore
-        }
+        profileViewModel.fetchProfileAndStats(userProgress.userId, userProgress, onProgressUpdate)
     }
 
     var dailyReminderEnabled by remember { mutableStateOf(sharedPrefs.getBoolean("daily_reminder_enabled", true)) }
@@ -212,7 +182,7 @@ fun ProfileScreen(
                     if (isEditingName) {
                         OutlinedTextField(
                             value = nameInput,
-                            onValueChange = { nameInput = it },
+                            onValueChange = { profileViewModel.setNameInput(it) },
                             singleLine = true,
                             textStyle = androidx.compose.ui.text.TextStyle(
                                 fontWeight = FontWeight.Bold,
@@ -228,23 +198,18 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(onClick = {
                             if (nameInput.isNotBlank()) {
-                                isLoading = true
-                                coroutineScope.launch {
-                                    try {
-                                        val response = authRepository.updateProfile(ProfileUpdateRequest(displayName = nameInput))
-                                        isLoading = false
-                                        if (response.isSuccessful) {
-                                            onProgressUpdate(userProgress.copy(name = nameInput))
-                                            isEditingName = false
+                                profileViewModel.updateDisplayName(
+                                    name = nameInput,
+                                    userProgress = userProgress,
+                                    onProgressUpdate = onProgressUpdate,
+                                    onResult = { success ->
+                                        if (success) {
                                             Toast.makeText(context, "Đã đổi tên thành công!".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                         } else {
                                             Toast.makeText(context, "Đổi tên thất bại!".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                         }
-                                    } catch (e: Exception) {
-                                        isLoading = false
-                                        Toast.makeText(context, "Lỗi kết nối".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                     }
-                                }
+                                )
                             }
                         }, enabled = !isLoading) {
                             Text("Lưu".translated(userProgress.appLanguage), fontWeight = FontWeight.Bold)
@@ -260,7 +225,10 @@ fun ProfileScreen(
                                 fontSize = 18.sp
                             )
                             IconButton(
-                                onClick = { isEditingName = true },
+                                onClick = {
+                                    profileViewModel.setIsEditingName(true)
+                                    profileViewModel.setNameInput(userProgress.name)
+                                },
                                 modifier = Modifier.size(24.dp)
                             ) {
                                 Icon(
@@ -916,22 +884,18 @@ fun ProfileScreen(
                                 Card(
                                     onClick = {
                                         showGoalPicker = false
-                                        isLoading = true
-                                        coroutineScope.launch {
-                                            try {
-                                                val response = authRepository.updateProfile(ProfileUpdateRequest(targetGoal = goal))
-                                                isLoading = false
-                                                if (response.isSuccessful) {
-                                                    onProgressUpdate(userProgress.copy(targetGoal = goal))
+                                        profileViewModel.updateTargetGoal(
+                                            goal = goal,
+                                            userProgress = userProgress,
+                                            onProgressUpdate = onProgressUpdate,
+                                            onResult = { success ->
+                                                if (success) {
                                                     Toast.makeText(context, "Đã cập nhật mục tiêu học!".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                                 } else {
                                                     Toast.makeText(context, "Cập nhật thất bại!".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                                 }
-                                            } catch (e: Exception) {
-                                                isLoading = false
-                                                Toast.makeText(context, "Lỗi kết nối".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                             }
-                                        }
+                                        )
                                     },
                                     colors = CardDefaults.cardColors(
                                         containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -987,22 +951,18 @@ fun ProfileScreen(
                                 Card(
                                     onClick = {
                                         showWordsPerDayPicker = false
-                                        isLoading = true
-                                        coroutineScope.launch {
-                                            try {
-                                                val response = authRepository.updateProfile(ProfileUpdateRequest(wordsPerDay = count))
-                                                isLoading = false
-                                                if (response.isSuccessful) {
-                                                    onProgressUpdate(userProgress.copy(wordsPerDay = count))
+                                        profileViewModel.updateWordsPerDay(
+                                            count = count,
+                                            userProgress = userProgress,
+                                            onProgressUpdate = onProgressUpdate,
+                                            onResult = { success ->
+                                                if (success) {
                                                     Toast.makeText(context, "Đã cập nhật mục tiêu từ vựng hàng ngày!".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                                 } else {
                                                     Toast.makeText(context, "Cập nhật thất bại!".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                                 }
-                                            } catch (e: Exception) {
-                                                isLoading = false
-                                                Toast.makeText(context, "Lỗi kết nối".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                             }
-                                        }
+                                        )
                                     },
                                     colors = CardDefaults.cardColors(
                                         containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -1100,29 +1060,17 @@ fun ProfileScreen(
                     Button(
                         onClick = {
                             showResetConfirmDialog = false
-                            isLoading = true
-                            coroutineScope.launch {
-                                try {
-                                    val response = learningRepository.resetProgress()
-                                    isLoading = false
-                                    if (response.isSuccessful && response.body()?.success == true) {
-                                        onProgressUpdate(UserProgress(
-                                            userId = userProgress.userId,
-                                            email = userProgress.email,
-                                            name = userProgress.name,
-                                            targetGoal = userProgress.targetGoal,
-                                            wordsPerDay = userProgress.wordsPerDay,
-                                            appLanguage = userProgress.appLanguage
-                                        ))
+                            profileViewModel.resetProgress(
+                                userProgress = userProgress,
+                                onProgressUpdate = onProgressUpdate,
+                                onResult = { success ->
+                                    if (success) {
                                         Toast.makeText(context, "Đã khôi phục cài đặt tiến độ ban đầu thành công!".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                     } else {
-                                        Toast.makeText(context, response.body()?.message ?: "Đặt lại tiến độ thất bại!".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "Đặt lại tiến độ thất bại!".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
                                     }
-                                } catch (e: Exception) {
-                                    isLoading = false
-                                    Toast.makeText(context, "Lỗi kết nối".translated(userProgress.appLanguage) + ": ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                                 }
-                            }
+                            )
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) {
