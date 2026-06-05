@@ -2,6 +2,16 @@ package com.example.minlishapp.core.utils
 
 object LanguageHelper {
     private val translations = mapOf(
+        // Fix missing / partial translations
+        "Từ liên quan (Phân cách bằng dấu phẩy)" to "Related words (Comma separated)",
+        "Ghi chú (Note)" to "Note",
+        "Kho từ vựng mới sắp hết!" to "New vocabulary stock is running out!",
+        "Bạn đã học hết từ mới trong các bộ từ hiện tại. Hãy tạo hoặc tải thêm bộ từ vựng mới!" to "You have learned all new words in current decks. Please create or import new vocabulary decks!",
+        "Số từ mới còn lại" to "Remaining new words",
+        "ít hơn mục tiêu hàng ngày" to "is less than your daily goal",
+        " của bạn. Nên chuyển mục tiêu học thành" to ". You should change your learning goal to",
+        "từ/ngày hoặc bổ sung thêm từ vựng mới." to "words/day or add more new words.",
+        
         // Navigation & Bottom Bar
         "Lộ trình" to "Roadmap",
         "Từ vựng" to "Vocabulary",
