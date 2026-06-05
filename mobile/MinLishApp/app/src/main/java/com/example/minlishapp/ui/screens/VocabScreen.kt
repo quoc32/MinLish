@@ -1080,6 +1080,7 @@ fun ManageCardsDialog(
 ) {
     var editingCard by remember { mutableStateOf<Word?>(null) }
     var cardToDelete by remember { mutableStateOf<Word?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
     val context = LocalContext.current
 
     Dialog(
@@ -1137,68 +1138,93 @@ fun ManageCardsDialog(
                             }
                         )
                     } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize().weight(1f),
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(cardsList) { card ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(card.word, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                            if (card.pronunciation.isNotBlank()) {
-                                                Text(card.pronunciation, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                            Text(card.meaning, fontSize = 14.sp)
-                                        }
-                                        IconButton(onClick = { editingCard = card }) {
-                                            Icon(Icons.Default.Edit, contentDescription = "Sửa".translated(userProgress.appLanguage), tint = MaterialTheme.colorScheme.primary)
-                                        }
-                                        IconButton(onClick = { cardToDelete = card }) {
-                                            Icon(Icons.Default.Delete, contentDescription = "Xóa".translated(userProgress.appLanguage), tint = MaterialTheme.colorScheme.error)
-                                        }
-                                    }
+                        val sortedCardsList = remember(cardsList) { cardsList.sortedBy { it.word.lowercase() } }
+                        val filteredCardsList = remember(sortedCardsList, searchQuery) {
+                            if (searchQuery.isBlank()) {
+                                sortedCardsList
+                            } else {
+                                sortedCardsList.filter { 
+                                    it.word.contains(searchQuery, ignoreCase = true) || 
+                                    it.meaning.contains(searchQuery, ignoreCase = true) 
                                 }
                             }
                         }
 
-                        if (cardToDelete != null) {
-                            AlertDialog(
-                                onDismissRequest = { cardToDelete = null },
-                                title = { Text("Xác nhận xóa".translated(userProgress.appLanguage)) },
-                                text = { Text("Bạn có chắc chắn muốn xóa từ vựng '${cardToDelete?.word}' không?".translated(userProgress.appLanguage)) },
-                                confirmButton = {
-                                    Button(
-                                        onClick = {
-                                            val targetId = cardToDelete!!.id
-                                            cardToDelete = null
-                                            onDeleteCard(targetId) { success, msg ->
-                                                if (success) {
-                                                    Toast.makeText(context, "Đã xóa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
-                                                    onRefreshCards()
-                                                } else {
-                                                    Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                placeholder = { Text("Tìm kiếm từ vựng...".translated(userProgress.appLanguage)) },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                                singleLine = true
+                            )
+
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize().weight(1f),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(filteredCardsList) { card ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                                     ) {
-                                        Text("Xóa".translated(userProgress.appLanguage), color = Color.White)
-                                    }
-                                },
-                                dismissButton = {
-                                    OutlinedButton(onClick = { cardToDelete = null }) {
-                                        Text("Hủy".translated(userProgress.appLanguage))
+                                        Row(
+                                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(card.word, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                if (card.pronunciation.isNotBlank()) {
+                                                    Text(card.pronunciation, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                                Text(card.meaning, fontSize = 14.sp)
+                                            }
+                                            IconButton(onClick = { editingCard = card }) {
+                                                Icon(Icons.Default.Edit, contentDescription = "Sửa".translated(userProgress.appLanguage), tint = MaterialTheme.colorScheme.primary)
+                                            }
+                                            IconButton(onClick = { cardToDelete = card }) {
+                                                Icon(Icons.Default.Delete, contentDescription = "Xóa".translated(userProgress.appLanguage), tint = MaterialTheme.colorScheme.error)
+                                            }
+                                        }
                                     }
                                 }
-                            )
+                            }
+
+                            if (cardToDelete != null) {
+                                AlertDialog(
+                                    onDismissRequest = { cardToDelete = null },
+                                    title = { Text("Xác nhận xóa".translated(userProgress.appLanguage)) },
+                                    text = { Text("Bạn có chắc chắn muốn xóa từ vựng '${cardToDelete?.word}' không?".translated(userProgress.appLanguage)) },
+                                    confirmButton = {
+                                        Button(
+                                            onClick = {
+                                                val targetId = cardToDelete!!.id
+                                                cardToDelete = null
+                                                onDeleteCard(targetId) { success, msg ->
+                                                    if (success) {
+                                                        Toast.makeText(context, "Đã xóa".translated(userProgress.appLanguage), Toast.LENGTH_SHORT).show()
+                                                        onRefreshCards()
+                                                    } else {
+                                                        Toast.makeText(context, "Lỗi".translated(userProgress.appLanguage) + ": $msg", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                        ) {
+                                            Text("Xóa".translated(userProgress.appLanguage), color = Color.White)
+                                        }
+                                    },
+                                    dismissButton = {
+                                        OutlinedButton(onClick = { cardToDelete = null }) {
+                                            Text("Hủy".translated(userProgress.appLanguage))
+                                        }
+                                    }
+                                )
+                            }
                         }
                     }
                 }
