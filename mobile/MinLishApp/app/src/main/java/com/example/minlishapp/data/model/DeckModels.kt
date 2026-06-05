@@ -46,7 +46,7 @@ data class DeckExportDeckInfo(
     val name: String,
     val icon: String?,
     val tag: String?,
-    @com.google.gson.annotations.SerializedName("target_goal") val targetGoal: Int?
+    @com.google.gson.annotations.SerializedName("target_goal") val targetGoal: String?
 )
 
 // Used for writing the export file (what we actually save to disk)
