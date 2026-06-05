@@ -35,9 +35,11 @@ import kotlinx.coroutines.launch
 import com.example.minlishapp.core.utils.translated
 import androidx.compose.runtime.collectAsState
 import androidx.navigation.NavHostController
+import com.example.minlishapp.ui.components.UserAvatar
+import com.example.minlishapp.ui.components.getTierForLevel
+import com.example.minlishapp.ui.components.AvatarTier
 
 @Composable
-
 fun ProfileScreen(
     profileViewModel: com.example.minlishapp.ui.viewmodel.ProfileViewModel,
     userProgress: UserProgress,
@@ -78,22 +80,13 @@ fun ProfileScreen(
     val goalOptions = listOf("IELTS", "TOEIC", "Giao tiếp", "THPT Quốc gia")
     val wordsPerDayOptions = listOf(5, 10, 15, 20, 25)
 
-    // Tính toán Progress Score và Level Title theo công thức real-time
-    val masteredScore = minOf(100f, (masteredWords.toFloat() / 750f) * 100f)
-    val accuracyPercent = accuracyRate.toFloat() // accuracyRate từ backend đã là % (0 - 100)
-    val accuracyScore = (accuracyPercent / 10f).toInt() * 10f
-    val streakScore = minOf(100f, (userProgress.streak.toFloat() / 30f) * 100f)
+    val currentLevel = userProgress.level
+    val currentXp = userProgress.xp
+    val xpInLevel = currentXp % 100
+    val progressScore = xpInLevel.toFloat()
     
-    val progressScore = (masteredScore * 0.5f) + (accuracyScore * 0.3f) + (streakScore * 0.2f)
-
-    val isBeginner = masteredWords < 200 || progressScore < 40
-    val isIntermediate = !isBeginner && (masteredWords < 800 || progressScore < 70)
-    val levelTitle = when {
-        isBeginner -> "Beginner"
-        isIntermediate -> "Intermediate"
-        else -> "Advanced"
-    }
-    val displayScore = (progressScore * 10).toInt() / 10.0
+    val tier = getTierForLevel(currentLevel)
+    val levelTitle = tier.title
 
     val currentTier = levelTitle
 
@@ -101,11 +94,12 @@ fun ProfileScreen(
         if (masteredWords > 0 || accuracyRate > 0) {
             val lastTier = sharedPrefs.getString("last_known_tier", "") ?: ""
             if (lastTier.isNotEmpty() && lastTier != currentTier) {
-                val getTierPriority = { tier: String ->
-                    when (tier) {
-                        "Advanced" -> 3
-                        "Intermediate" -> 2
-                        "Beginner" -> 1
+                val getTierPriority = { t: String ->
+                    when (t) {
+                        AvatarTier.DIAMOND.title -> 4
+                        AvatarTier.GOLD.title -> 3
+                        AvatarTier.SILVER.title -> 2
+                        AvatarTier.BRONZE.title -> 1
                         else -> 0
                     }
                 }
@@ -154,27 +148,7 @@ fun ProfileScreen(
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.secondary
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (userProgress.name.isNotEmpty()) userProgress.name.first().toString().uppercase() else "L",
-                            color = Color.White,
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Black
-                        )
-                    }
+                    UserAvatar(name = userProgress.name, level = userProgress.level, size = 80.dp)
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -246,17 +220,16 @@ fun ProfileScreen(
                                 modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
                             )
                         }
-                        val tierIcon = when (levelTitle) {
-                            "Advanced" -> "🏆 Advanced"
-                            "Intermediate" -> "📘 Intermediate"
-                            else -> "🌱 Beginner"
+                        
+                        val tierName = if (userProgress.appLanguage == "English") tier.title else tier.titleVi
+                        val tierIcon = when (tier) {
+                            AvatarTier.DIAMOND -> "💎 $tierName"
+                            AvatarTier.GOLD -> "🏆 $tierName"
+                            AvatarTier.SILVER -> "🥈 $tierName"
+                            AvatarTier.BRONZE -> "🥉 $tierName"
                         }
                         
-                        val tierColor = when (levelTitle) {
-                            "Advanced" -> Color(0xFFFFD700) // Gold
-                            "Intermediate" -> Color(0xFF1E88E5) // Blue
-                            else -> Color(0xFF4CAF50) // Green
-                        }
+                        val tierColor = tier.textColor
 
                         val tierBgColor = tierColor.copy(alpha = 0.08f)
                         val tierBorderColor = tierColor.copy(alpha = 0.25f)
@@ -267,21 +240,9 @@ fun ProfileScreen(
                         val progressText = "█".repeat(activeBlocks) + "░".repeat(inactiveBlocks)
 
                         val textRemaining = if (userProgress.appLanguage == "English") {
-                            if (progressScore < 40) {
-                                "${40 - progressScore.toInt()} points remaining to reach Intermediate."
-                            } else if (progressScore < 70) {
-                                "${70 - progressScore.toInt()} points remaining to reach Advanced."
-                            } else {
-                                "You have reached the maximum Advanced level!"
-                            }
+                            "${100 - xpInLevel} XP remaining to reach Level ${currentLevel + 1}."
                         } else {
-                            if (progressScore < 40) {
-                                "Còn ${40 - progressScore.toInt()} điểm để đạt Intermediate."
-                            } else if (progressScore < 70) {
-                                "Còn ${70 - progressScore.toInt()} điểm để đạt Advanced."
-                            } else {
-                                "Bạn đã đạt cấp độ tối đa Advanced!"
-                            }
+                            "Còn ${100 - xpInLevel} XP để đạt Level ${currentLevel + 1}."
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
@@ -310,7 +271,7 @@ fun ProfileScreen(
 
                                 // Score
                                 Text(
-                                    text = "Score: ${progressScore.toInt()} / 100",
+                                    text = "XP: $xpInLevel / 100",
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurface

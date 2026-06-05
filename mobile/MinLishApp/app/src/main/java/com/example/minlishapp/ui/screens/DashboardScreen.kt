@@ -32,7 +32,7 @@ import com.example.minlishapp.data.UserProgress
 import com.example.minlishapp.ui.theme.ColorStreakFlame
 import com.example.minlishapp.core.utils.LanguageHelper
 import com.example.minlishapp.core.utils.translated
-
+import com.example.minlishapp.ui.components.UserAvatar
 
 @Composable
 fun DashboardScreen(
@@ -87,21 +87,8 @@ fun DashboardScreen(
                     ) {
                         // Level Badge
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "${userProgress.level}",
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
+                            UserAvatar(name = userProgress.name, level = userProgress.level, size = 48.dp)
+                            Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
                                     text = userProgress.name,
